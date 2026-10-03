@@ -88,7 +88,6 @@ MAP X        TO KEY     KEY_V
 MAP Y        TO KEY     KEY_E
 MAP MENU     TO KEY     KEY_ESC
 MAP FN+START TO KEY     KEY_F
-MAP FN+MENU  TO KEY     KEY_Z
 MAP FN+UP    TO COMMAND snapshot
 MAP FN+A     TO COMMAND volume up
 MAP FN+Y     TO COMMAND volume down
@@ -96,8 +95,8 @@ MAP FN+X     TO COMMAND brightness up
 MAP FN+B     TO COMMAND brightness down
 MAP FN+L     TO KEY     KEY_4
 MAP FN+R     TO KEY     KEY_5
-MAP FN+L+R   TO COMMAND system_stats toggle
-MAP FN+START+MENU TO COMMAND /mnt/FunKey/Xash3D/nano-supervise-arm --stop /run/xash-nano.sock
+MAP FN+L+R   TO COMMAND /mnt/FunKey/Xash3D/nano-supervise-arm --stop /run/xash-nano.sock
+MAP FN+START+L+R TO COMMAND system_stats toggle
 '''
 keymap=keymap.replace('/mnt/FunKey/Xash3D/',runtime_root+'/')
 (data/'nano.key').write_text(keymap,newline='\n')

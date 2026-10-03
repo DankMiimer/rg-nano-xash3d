@@ -96,7 +96,7 @@ An existing save directory is retained. Runtime files, controls and launcher ent
 
 ## Recovery and diagnostics
 
-At startup, the launcher reapplies saved system volume and enables the speaker amplifier, respecting volume zero. It runs the game under `nano-supervise-arm`. Hold **Fn + Start + Menu** to request shutdown. The supervisor resumes a stopped child, sends TERM to its own process group, and escalates to KILL after five seconds if needed. The launcher then restores the stock clock and default keys. This covers ordinary crashes and userspace hangs; it does not guarantee recovery from a kernel or device-driver lockup.
+At startup, the launcher reapplies saved system volume and enables the speaker amplifier, respecting volume zero. It runs the game under `nano-supervise-arm`. Hold **Fn + L + R** to request shutdown. The supervisor resumes a stopped child, sends TERM to its own process group, and escalates to KILL after five seconds if needed. The launcher then restores the stock clock and default keys. This covers ordinary crashes and userspace hangs; it does not guarantee recovery from a kernel or device-driver lockup.
 
 Diagnostics are under `diagnostics/valve` or `diagnostics/cstrike` inside the runtime. `engine.log` captures output, `metrics.csv` samples RAM/swap/page faults/CPU counters every two seconds, and `result.txt` records exit status, termination signals and crash signals printed by Xash's own handler (which can otherwise exit with code zero). Engine and metric logs keep two files of at most 512 KiB each. There is no automatic freeze detector; recovery is user-triggered.
 

@@ -11,7 +11,6 @@
 | Y | Reload |
 | Fn/Select held | Crouch |
 | Menu | Escape/back/game menu |
-| Fn + Menu | Centre aim |
 
 The original port remaps several letter keys internally. X uses regular `v`, rather than Control, because the modifier mapping did not fire reliably. The firmware keymap also compensates for the GPIO daemon's key-name index mismatch for arrow keys. Keep the supplied keymap together with the engine bindings.
 
@@ -27,4 +26,6 @@ Start toggles the flashlight. Fn + Start cycles weapons. Fn + Left/Right looks u
 
 System volume, brightness and screenshot shortcuts are retained.
 
-Hold **Fn + Start + Menu** to stop a stuck game through the supervisor. Allow up to five seconds for forced shutdown and a little longer for launcher cleanup. The same shortcut is used by the isolated native test runtime.
+Hold **Fn + L + R** to stop a stuck game through the supervisor. Allow up to five seconds for forced shutdown and a little longer for launcher cleanup. The same shortcut is used by the isolated native test runtime.
+
+Fn + Start + L + R toggles system stats. The Nano firmware processes Menu as a standalone power-button event; it cannot be included in these GPIO button combinations.
