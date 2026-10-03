@@ -16,7 +16,7 @@
 
 The original port remaps several letter keys internally. X uses regular `v`, rather than Control, because the modifier mapping did not fire reliably. The firmware keymap also compensates for the GPIO daemon's key-name index mismatch for arrow keys. Keep the supplied keymap together with the engine bindings.
 
-Camera movement is slow by default (70/75 degrees per second for yaw/pitch). Holding L makes both turning and vertical look three times faster, without changing walking or strafing speed. Hold L + R and use Up/Down for fast vertical look. Releasing L restores precise camera speed; releasing R restores ordinary D-pad movement.
+The source-built profile starts camera movement at 70/75 degrees per second for yaw/pitch. Holding Left/Right keeps precise yaw for 0.15 seconds, then smoothly increases it to 210 over 0.75 seconds. Release, reversal, R strafing, or a long frame stall resets the ramp. Only yaw accelerates; walking, strafing and vertical look do not ramp. Holding L makes both turning and vertical look three times faster, without changing walking or strafing speed. Hold L + R and use Up/Down for fast vertical look. Releasing L restores precise camera speed; releasing R restores ordinary D-pad movement.
 
 ## Counter-Strike
 

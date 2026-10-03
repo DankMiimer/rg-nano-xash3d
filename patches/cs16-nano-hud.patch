@@ -1,0 +1,249 @@
+--- a/cl_dll/health.cpp
++++ b/cl_dll/health.cpp
+@@ -23,6 +23,7 @@
+ #include "math.h"
+ 
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ #include <string.h>
+@@ -260,6 +261,8 @@
+ 
+ void CHudHealth::DrawHealthBar( float flTime )
+ {
++	NanoHudScope nanoScope("nano_hud_bottom", 0, 1);
++
+ 	int r, g, b;
+ 	int a = 0, x, y;
+ 	int HealthWidth;
+@@ -275,6 +278,7 @@
+ 
+ 		y = ScreenHeight - gHUD.m_iFontHeight - gHUD.m_iFontHeight / 2;
+ 		x = CrossWidth /2;
++		nanoScope.Place(CrossWidth/2, y, CrossWidth + 3.5f*HealthWidth, y+max(gHUD.m_iFontHeight,gHUD.GetSpriteRect(m_HUD_cross).Height()), 0, 1);
+ 
+ 		SPR_Set(gHUD.GetSprite(m_HUD_cross), r, g, b);
+ 		SPR_DrawAdditive(0, x, y, &gHUD.GetSpriteRect(m_HUD_cross));
+--- a/cl_dll/battery.cpp
++++ b/cl_dll/battery.cpp
+@@ -19,6 +19,7 @@
+ //
+ 
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "parsemsg.h"
+ #include "cl_util.h"
+ #include "draw_util.h"
+@@ -71,6 +72,8 @@
+ 
+ int CHudBattery::Draw( float flTime )
+ {
++	NanoHudScope nanoScope("nano_hud_bottom", 0, 1);
++
+ 	if( gHUD.m_iHideHUDDisplay & HIDEHUD_HEALTH )
+ 		return 1;
+ 
+@@ -113,6 +116,12 @@
+ 	y = ScreenHeight - gHUD.m_iFontHeight - gHUD.m_iFontHeight / 2;
+ 	x = ScreenWidth / 5;
+ 
++	int dw = gHUD.GetSpriteRect(gHUD.m_HUD_number_0).Width();
++	int cw = gHUD.GetSpriteRect(gHUD.GetSpriteIndex("cross")).Width();
++	float size = gEngfuncs.pfnGetCvarFloat("nano_hud_bottom");
++	nanoScope.Place(x, y, x+m_hEmpty[m_enArmorType].rect.Width()+3*dw,
++		y+max(gHUD.m_iFontHeight,m_iHeight), 0, 1, 6+(cw/2.0f+3.5f*dw)*size, 2);
++
+ 	// make sure we have the right sprite handles
+ 	SPR_Set( m_hFull[m_enArmorType].spr, r, g, b );
+ 	SPR_DrawAdditive( 0, x, y, &m_hFull[m_enArmorType].rect );
+--- a/cl_dll/hud/money.cpp
++++ b/cl_dll/hud/money.cpp
+@@ -33,6 +33,7 @@
+ #include "math.h"
+ 
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ #include <string.h>
+@@ -61,6 +62,8 @@
+ 
+ int CHudMoney::Draw(float flTime)
+ {
++	NanoHudScope nanoScope("nano_hud_side", 1, 0.5);
++
+ 	if( gHUD.m_iHideHUDDisplay & ( HIDEHUD_MONEY | HIDEHUD_ALL ) )
+ 		return 1;
+ 
+@@ -83,6 +86,7 @@
+ 
+ 	int x = ScreenWidth - iDollarWidth * 7;
+ 	int y = MONEY_YPOS;
++	nanoScope.Place(x, y-m_hDollar.rect.Height()*1.5f, x+iDollarWidth+5*gHUD.GetSpriteRect(gHUD.m_HUD_number_0).Width(), y+max(m_hDollar.rect.Height(),gHUD.m_iFontHeight), 1, 0);
+ 
+ 	if( m_iBlinkAmt )
+ 	{
+--- a/cl_dll/hud/timer.cpp
++++ b/cl_dll/hud/timer.cpp
+@@ -31,6 +31,7 @@
+ #include "math.h"
+ 
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ #include "vgui_parser.h"
+@@ -56,6 +57,8 @@
+ 
+ int CHudTimer::Draw( float fTime )
+ {
++	NanoHudScope nanoScope("nano_hud_bottom", 0.5, 1);
++
+ 	if( gHUD.m_iHideHUDDisplay & ( HIDEHUD_TIMER | HIDEHUD_ALL ) )
+ 		return 1;
+ 
+@@ -97,6 +100,9 @@
+ 
+ 	int x = (ScreenWidth - totalWidth) / 2;
+ 	int y = ScreenHeight - 1.5 * gHUD.m_iFontHeight;
++
++	nanoScope.Place(x, y, x+totalWidth, y+gHUD.m_iFontHeight, 0.5, 1, 2,
++		6+gHUD.m_iFontHeight*gEngfuncs.pfnGetCvarFloat("nano_hud_bottom"));
+ 
+ 	SPR_Set(gHUD.GetSprite(m_HUD_timer), r, g, b);
+ 	SPR_DrawAdditive(0, x, y, &gHUD.GetSpriteRect(m_HUD_timer));
+--- a/cl_dll/status_icons.cpp
++++ b/cl_dll/status_icons.cpp
+@@ -16,6 +16,7 @@
+ // status_icons.cpp
+ //
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "const.h"
+ #include "entity_state.h"
+@@ -51,11 +52,14 @@
+ // Draw status icons along the left-hand side of the screen
+ int CHudStatusIcons::Draw( float flTime )
+ {
++	NanoHudScope nanoScope("nano_hud_side", 0, 0.5);
++
+ 	if (gEngfuncs.IsSpectateOnly())
+ 		return 1;
+ 	// find starting position to draw from, along right-hand side of screen
+ 	int x = 5;
+ 	int y = ScreenHeight / 2;
++	nanoScope.Place(x, 0, x, ScreenHeight, 0, 0.5, 2, 0);
+ 
+ 	// loop through icon list, and draw any valid icons drawing up from the middle of screen
+ 	for ( int i = 0; i < MAX_ICONSPRITES; i++ )
+--- a/cl_dll/menu.cpp
++++ b/cl_dll/menu.cpp
+@@ -18,6 +18,7 @@
+ // generic menu handler
+ //
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ #include "com_weapons.h"
+@@ -83,6 +84,8 @@
+ 
+ int CHudMenu :: Draw( float flTime )
+ {
++	NanoHudScope nanoScope("nano_hud_menu", 0, 0.5);
++
+ 	// check for if menu is set to disappear
+ 	if ( m_flShutoffTime > 0 )
+ 	{
+--- a/cl_dll/hud/radar.cpp
++++ b/cl_dll/hud/radar.cpp
+@@ -28,6 +28,7 @@
+ */
+ 
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ #include "draw_util.h"
+@@ -185,7 +186,7 @@
+ 
+ int CHudRadar::VidInit(void)
+ {
+-	bUseRenderAPI = g_iXash && InitBuiltinTextures();
++	bUseRenderAPI = !gEngfuncs.pfnGetCvarFloat("nano_hud_profile") && g_iXash && InitBuiltinTextures();
+ 
+ 	m_hRadar.SetSpriteByName( "radar" );
+ 	m_hRadarOpaque.SetSpriteByName( "radaropaque" );
+@@ -280,6 +281,8 @@
+ 
+ int CHudRadar::Draw(float flTime)
+ {
++	NanoHudScope nanoScope("nano_hud_radar", 0, 0);
++
+ 	if ( (gHUD.m_iHideHUDDisplay & HIDEHUD_HEALTH) ||
+ 		 gEngfuncs.IsSpectateOnly() ||
+ 		 !(gHUD.m_iWeaponBits & (1<<(WEAPON_SUIT))) ||
+--- a/cl_dll/ammo.cpp
++++ b/cl_dll/ammo.cpp
+@@ -19,6 +19,8 @@
+ //
+ 
+ #include "hud.h"
++#include "nano-hud-scope.h"
++#include "nano-crosshair.h"
+ #include "cvardef.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+@@ -1085,6 +1087,7 @@
+ 
+ 	WEAPON *pw = m_pWeapon; // shorthand
+ 
++	NanoHudScope nanoScope("nano_hud_bottom", 1, 1);
+ 	// SPR_Draw Ammo
+ 	if ((pw->iAmmoType < 0) && (pw->iAmmo2Type < 0))
+ 		return 0;
+@@ -1104,6 +1107,7 @@
+ 
+ 	// Does this weapon have a clip?
+ 	y = ScreenHeight - gHUD.m_iFontHeight - gHUD.m_iFontHeight/2;
++	nanoScope.Place(ScreenWidth-8*AmmoWidth-m_pWeapon->rcAmmo.Width(), y-m_pWeapon->rcAmmo.Height()/8, ScreenWidth, y+max(gHUD.m_iFontHeight,m_pWeapon->rcAmmo.Height()-m_pWeapon->rcAmmo.Height()/8), 1, 1);
+ 
+ 	// Does weapon have any ammo at all?
+ 	if (m_pWeapon->iAmmoType > 0)
+@@ -1171,6 +1175,8 @@
+ 
+ void CHudAmmo::DrawSpriteCrosshair()
+ {
++	NanoHudScope nanoCross(gHUD.m_iFOV > 40 ? "nano_hud_crosshair" : "nano_hud_identity", 0.5, 0.5);
++
+ 	int x, y;
+ 
+ 	if( g_iUser1 && g_iUser1 != OBS_IN_EYE )
+@@ -1706,6 +1712,25 @@
+ 		flCrosshairDistance = m_flCrosshairDistance;
+ 	}
+ 
++	// Quantize stock dynamic gap/length once, then mirror about one center pixel.
++	if (gEngfuncs.pfnGetCvarFloat("nano_hud_profile")) {
++		float hs = gHUD.m_flScale > 0 ? gHUD.m_flScale : 1.0f;
++		int width = (int)floorf(ScreenWidth*hs + 0.5f);
++		int height = (int)floorf(ScreenHeight*hs + 0.5f);
++		float sx = width/(float)ScreenWidth;
++		NanoCrosshairRect arms[4];
++		NanoCrosshairRects(width, height, flCrosshairDistance*sx, iLength*sx, arms);
++		float oldPixels = gEngfuncs.pfnGetCvarFloat("nano_hud_pixel_coordinates");
++		gEngfuncs.Cvar_SetValue("nano_hud_pixel_coordinates", 1);
++		for (int i=0; i<4; ++i) {
++			NanoCrosshairRect &a = arms[i];
++			if (m_bAdditive) FillRGBA(a.x, a.y, a.w, a.h, m_R, m_G, m_B, m_iAlpha);
++			else FillRGBABlend(a.x, a.y, a.w, a.h, m_R, m_G, m_B, m_iAlpha);
++		}
++		gEngfuncs.Cvar_SetValue("nano_hud_pixel_coordinates", oldPixels);
++		return;
++	}
++
+ 	// drawing
+ 	if ( g_iXash && xhair_enable->value )
+ 	{

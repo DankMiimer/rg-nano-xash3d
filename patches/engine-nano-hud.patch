@@ -1,0 +1,82 @@
+--- a/engine/client/dll_int/cl_game.c
++++ b/engine/client/dll_int/cl_game.c
+@@ -314,35 +314,44 @@
+ draw hudsprite routine
+ ====================
+ */
++static cvar_t *nano_hud_profile, *nano_hud_scale, *nano_hud_ax, *nano_hud_ay;
++static cvar_t *nano_hud_dx, *nano_hud_dy, *nano_hud_pixels;
++static int nanoCrosshairDrawing;
++#include "../nano-hud-transform.h"
++
+ void SPR_AdjustSize( float *x, float *y, float *w, float *h )
+ {
+-	if( refState.width == clgame.scrInfo.iWidth && refState.height == clgame.scrInfo.iHeight )
+-		return;
+-
+-	// scale for screen sizes
+ 	float xscale = refState.width / (float)clgame.scrInfo.iWidth;
+ 	float yscale = refState.height / (float)clgame.scrInfo.iHeight;
+-
+-	*x *= xscale;
+-	*y *= yscale;
+-	*w *= xscale;
+-	*h *= yscale;
++	if (!(nano_hud_profile && nano_hud_profile->value && nano_hud_pixels->value)) {
++		*x *= xscale; *y *= yscale; *w *= xscale; *h *= yscale;
++	}
++	if (nano_hud_profile && nano_hud_profile->value)
++	{
++		NanoHudRect(x, y, w, h, refState.width, refState.height,
++			nanoCrosshairDrawing ? Cvar_VariableValue("nano_hud_crosshair") : nano_hud_scale->value,
++			nanoCrosshairDrawing ? 0.5f : nano_hud_ax->value, nanoCrosshairDrawing ? 0.5f : nano_hud_ay->value);
++		if (!nanoCrosshairDrawing) { *x += floorf(nano_hud_dx->value*xscale + 0.5f); *y += floorf(nano_hud_dy->value*yscale + 0.5f); }
++	}
+ }
+ 
+ static void SPR_AdjustTexCoords( int texnum, float width, float height, float *s1, float *t1, float *s2, float *t2 )
+ {
++	// The Nano's nearest-sampled software HUD must retain full sprite edges.
++	const qboolean nanoCrisp = nano_hud_profile && nano_hud_profile->value;
++
+ 	const qboolean filtering = REF_GET_PARM( PARM_TEX_FILTERING, texnum );
+ 	const int xremainder = refState.width % clgame.scrInfo.iWidth;
+ 	const int yremainder = refState.height % clgame.scrInfo.iHeight;
+ 
+-	if(( filtering || xremainder ) && refState.width != clgame.scrInfo.iWidth )
++	if(!nanoCrisp && ( filtering || xremainder ) && refState.width != clgame.scrInfo.iWidth )
+ 	{
+ 		// align to texel if scaling
+ 		*s1 += 0.5f;
+ 		*s2 -= 0.5f;
+ 	}
+ 
+-	if(( filtering || yremainder ) && refState.height != clgame.scrInfo.iHeight )
++	if(!nanoCrisp && ( filtering || yremainder ) && refState.height != clgame.scrInfo.iHeight )
+ 	{
+ 		// align to texel if scaling
+ 		*t1 += 0.5f;
+@@ -858,7 +867,9 @@
+ 	clgame.ds.pSprite = clgame.ds.pCrosshair;
+ 	Vector4Copy( clgame.ds.rgbaCrosshair, clgame.ds.spriteColor );
+ 
++	nanoCrosshairDrawing = 1;
+ 	pfnSPR_DrawHoles( 0, x, y, &clgame.ds.rcCrosshair );
++	nanoCrosshairDrawing = 0;
+ }
+ 
+ /*
+@@ -3982,6 +3993,13 @@
+ 	qboolean missed_exports = false;
+ 	qboolean try_internal_vgui_support = GI->internal_vgui_support;
+ 
++	nano_hud_profile = (cvar_t *)Cvar_Get("nano_hud_profile", "0", FCVAR_ARCHIVE, "Enable Nano HUD pixel alignment");
++	nano_hud_scale = (cvar_t *)Cvar_Get("nano_hud_element_scale", "1", 0, "Temporary HUD element scale");
++	nano_hud_ax = (cvar_t *)Cvar_Get("nano_hud_anchor_x", "0", 0, "HUD horizontal anchor");
++	nano_hud_ay = (cvar_t *)Cvar_Get("nano_hud_anchor_y", "0", 0, "HUD vertical anchor");
++	nano_hud_pixels = (cvar_t *)Cvar_Get("nano_hud_pixel_coordinates", "0", 0, "Temporary physical HUD coordinates");
++	nano_hud_dx = (cvar_t *)Cvar_Get("nano_hud_offset_x", "0", 0, "Temporary HUD horizontal offset");
++	nano_hud_dy = (cvar_t *)Cvar_Get("nano_hud_offset_y", "0", 0, "Temporary HUD vertical offset");
+ 	if( clgame.hInstance ) CL_UnloadProgs();
+ 
+ 	// initialize PlayerMove

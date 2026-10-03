@@ -1,6 +1,6 @@
 # Controller and original-style HUD research
 
-Research date: 2026-10-03. The target is the Nano's 240x240 software-rendered display and digital buttons. The user's preference is original artwork and recognizable placement, with individual elements made larger or smaller as needed. This document records candidates and an implementation plan; independent HUD scaling is not installed yet.
+Research date: 2026-10-03. The target is the Nano's 240x240 software-rendered display and digital buttons. The user's preference is original artwork and recognizable placement, with individual elements made larger or smaller as needed. Independent HUD transforms and horizontal camera acceleration are now implemented in the source-built runtime. Main/pause menu changes apply to both the engine menu and Counter-Strike's separate menu module. Settings submenus remain a separate layout task.
 
 ## Candidates worth using
 
@@ -18,38 +18,40 @@ The older [vitaXash3D](https://github.com/fgsfdsfgs/vitaXash3D) also documents h
 
 R runs `+strafe` and `+klook` together. The clients turn forward/back into vertical look while suppressing forward movement, and turn left/right into lateral movement while suppressing yaw. Releasing R ends both actions. This also accommodates diagonal input without creating overlapping firmware chords.
 
-The user confirmed the initial controls worked perfectly, then requested slow aiming as the default. Yaw/pitch now starts at 70/75 degrees per second; holding L selects 210/225 and releasing L restores the slow values. It changes camera rates only. L + R gives fast vertical look. Fn volume/brightness/save/load and recovery keep their existing mappings. The reversed speed profile still needs physical confirmation.
+The user confirmed the initial controls worked perfectly, then requested slow aiming as the default. Yaw/pitch now starts at 70/75 degrees per second; holding L selects 210/225 and releasing L restores the slow values. It changes camera rates only. L + R gives fast vertical look. Fn volume/brightness/save/load and recovery keep their existing mappings. The user confirmed the shoulder controls and subsequent yaw acceleration feel correct.
 
-## User sizing targets
+## Digital aiming: research and implementation
 
-- CS top-left radar: half its current width and height.
-- Crosshair: currently too small to see; preserve its recognizable shape but give it a visible minimum pixel thickness and larger arms.
-- HUD along the bottom and side: slightly larger, starting with a 1.15x trial.
-- Main/pause/settings menu text: 2-3x current size, with scrolling/layout adjusted so options remain accessible.
-- Team/weapon selection text: 1.25x current size.
+[Halo Infinite's official settings guide](https://support.halowaypoint.com/hc/en-us/articles/4407649252116-Guide-to-Halo-Infinite-Game-Settings) separates horizontal/vertical sensitivity and describes look acceleration as the rate of reaching maximum camera speed. [EA's Apex Legends accessibility guide](https://www.ea.com/able/resources/apex-legends/pc/features) documents controller response curves. Analog curves require an analog signal; the Nano D-pad instead provides direction and hold duration.
 
-These are independent settings. The radar's map and player markers must transform together; the crosshair stays exactly at screen center. A menu cannot be fixed by enlarging its font while leaving line spacing and hitboxes unchanged.
+Our implementation uses hold duration: 70 degrees/second yaw, 0.15 seconds of precise aiming, then a 0.75-second smoothstep ramp to 210. A fresh press, reversal, release, R strafing, L override/release or a frame stall resets it. L gives immediate fast look. Pitch and movement arithmetic are unchanged. This is newly written code inspired by the behavior, not copied Halo or Apex code. The client changes are opt-in and leave ordinary input unchanged when disabled.
 
-## Scaling quality requirements
+## Current HUD profile
 
-Ratios are targets, not a reason to distort artwork. Preserve aspect ratios and use rounded physical-pixel extents/anchors. Compare exact sprite pixel sizes and nearby scales on the Nano before selecting a default. Thin crosshair strokes must remain at least one physical pixel; test a two-pixel option for visibility. Downsampling needs special attention to icon outlines and radar contacts so important pixels do not vanish.
+| Group | Default | Placement / treatment |
+|---|---|---|
+| Health, armor, ammo | 1.125x | Whole blocks measured, health left and ammo right, approximately one physical pixel inside the bottom edge. Armor follows the reserved health width. |
+| CS timer | 1.125x | Centered row immediately above the bottom counters to prevent overlap on the square screen. |
+| CS money | 1.125x | Upper right; bounds include money-change indicators. |
+| Status icons | 1.125x | Left side, original vertical stacking; corrected left anchor. |
+| CS radar | 0.5x | Upper left, map and markers share one transform. |
+| Team/buy text | 1.25x | Original number-menu text and spacing transformed together; user confirmed good size. |
+| CS dynamic crosshair | At least five-pixel arms | Original colors, fades and dynamic spread; four mirrored rectangles share one physical center, three-pixel minimum gap and one-pixel stroke. |
+| Static crosshair | 2x | Original sprites; scope overlays excluded from enlargement. |
+| Main/pause buttons | 2x | Original menu font, row spacing and hitboxes resized; engine and CS menu libraries both patched; font rasterized at the larger size and cached, including CS's additional Readme row. Nano uses font text rather than stretched picture-button labels; the decorative title and debug Console entry are hidden to keep the rows unobstructed. Nano uses font text rather than stretched picture-button labels; the decorative title and debug Console entry are hidden to keep the rows unobstructed. |
 
-The pinned Half-Life client selects a 320-pixel sprite set when its virtual HUD width is below 640, while CS16Client explicitly loads the 640 set. Thus an identical global scale gives different physical glyph sizes. Check available original sprite variants before choosing per-element dimensions. Prefer sharp original sprite sampling, with no invented replacement font or artwork; compare filtering where reductions lose detail.
+The overall virtual HUD scale remains 0.65. Per-group transforms preserve aspect ratios and round destination edges to physical pixels. Every scope restores scale, anchors and offsets, including early returns and nested draws. Source sprite rectangles stay unchanged. Texture UVs must always be normalized: an initial crisp-sampling experiment omitted normalization and hid the HUD; the correction is covered by a regression test. Thin positive fills retain at least one pixel.
 
-Main/pause/settings menus belong to [FWGS mainui_cpp](https://github.com/FWGS/mainui_cpp), whereas CS team/buy number menus use `CHudMenu`. Their fonts and line spacing must be handled separately. The larger main menu target must not accidentally enlarge all game text or scale the rendered world.
+The CS crosshair is laid out directly in physical pixels to avoid truncation through the legacy integer drawing API. A fresh framebuffer capture confirmed five pixels in every arm and equal mirrored gaps. Full-screen scope/night vision and spectator views retain their existing behavior.
 
-## HUD implementation plan
+## Remaining layout and verification work
 
-1. Establish a reliable baseline using fresh framebuffer captures tied to a logged frame/run and a physical-screen check. Include HL with suit, weapons and damage indicators; CS alive with armor/ammo, buy menus, death/respawn and each spectator mode. Separate wrong sprite samples, transparency and clipping from an element that is simply too small.
-2. Keep the original `hud.txt` / weapon sprite assets, colors, numeric font, fades, icons and familiar left/right placement. Add opt-in Nano layout settings to the clients, with independent controls for health digits, armor digits, ammo digits, accompanying icons, radar, timer/money, weapon selection and text. Crosshair and full-screen scope/night vision overlays need separate treatment.
-3. Prototype health and ammo first. Measure the complete block, including digits, icon and gaps, then anchor health at the bottom left and ammunition at the bottom right. Place armor using the measured health extent, rather than a hard-coded fraction of screen width. Reserve the CS timer area and test large values before choosing defaults.
-4. Add the remaining groups. Initial direction, subject to physical feedback: enlarge important numbers and menu text where unreadable; compact decorative icons and weapon selection; size the CS radar independently so it does not dominate the upper-left view. Preserve radar blips and useful text rather than shrinking everything equally. Do not change crosshair behavior or shapes by default.
-5. Build a small shared transform helper for destination position/size and anchoring; keep source sprite rectangles separate. Inspect engine sprite drawing before choosing its interface: the pinned `SPR_DrawGeneric` path overwrites width/height with the source subrectangle extent, so passing arbitrary destination dimensions with `prc` is not sufficient. A limited, opt-in engine/client extension may be needed. Keep the existing renderer/client interface layout stable and leave ordinary drawing unchanged when disabled.
-6. Apply the same transform to icon/digit drawing, fills, text measurement and clipping within a group, then reset it after the group. Use pixel-aligned sampling and original transparency modes. Keep full-screen overlays, centered crosshair, menus and spectator map outside ordinary corner transforms.
-7. Verify 0/9/10/99/100 values, long names, empty/full armor, low-health flashes, ammo changes, radar contacts, weapon selection and all four screen edges. Check cropping and alpha under the existing renderer sanitizers; validate the final dimensions on the physical Nano. Compare frame time/RAM at 1200 MHz and preserve a profile switch to the previous layout.
+1. Adapt settings submenus with suitable row spacing/scrolling, rather than only enlarging their fonts.
+2. Verify Half-Life with suit, armor, weapon/ammo and damage indicators. Its 320-pixel sprite set differs from CS's 640-pixel set, so compare physical readability independently.
+3. Check extreme values, money deltas, empty/full armor, primary/secondary ammo, radar contacts, long team/buy text and death/respawn. Preserve original colors, fades and artwork.
+4. Measure a repeatable CS round and HL campaign scene for frame-time, memory/swap and audio stalls at 1200 MHz. Optimize only demonstrated bottlenecks.
+5. Keep source-built entries separate until parity and extended stability are established; publish source/recipes without game assets, extracted icons or unlicensed fonts/navigation.
 
-A single global `hud_scale` cannot meet the mixed-size requirement. It currently remains 0.65 until the element-specific path has been implemented and checked. Avoid replacing assets with a modern HUD pack: that adds a different visual style without solving layout in both clients.
+Run `NANO_NATIVE_DIR=/path/to/native-build python3 tests/test_nano_look_hud.py` under Linux after fetching/building. It compiles actual client yaw functions and engine HUD functions with AddressSanitizer/UndefinedBehaviorSanitizer, and exercises frame rates, reversals, pitch/strafe invariance, nested scopes, edge placement, symmetric crosshair geometry and normalized sprite UVs.
 
-## Reuse and attribution
-
-No additional third-party source was copied by this research. For subsequent imports, record the exact revision and files and retain their copyright/license notices. CS16Client's drawing helper carries GPL-2.0-or-later with an HL linking exception; BugfixedHL's repository advertises GPL-3.0 and includes SDK-derived code; portable/Unified SDK files also carry Valve SDK notices. Treat each file's notice separately rather than assigning a blanket license to all game code. Continue distributing patches/recipes without the user's game sprites or extracted icons.
+`test_nano_menu.py` compiles both real menu arrangement methods and font-cache method against a small host harness; it checks maximum rows, late visibility changes and reuse/invalidation of the enlarged font.

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Fetch pinned source trees and apply the two reviewed Nano patches."""
+"""Fetch pinned source trees and apply the reviewed Nano patches."""
 from pathlib import Path
 import json
-import subprocess
+import subprocess, shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = json.loads((ROOT/'sources.lock.json').read_text())
@@ -43,3 +43,7 @@ if __name__ == '__main__':
     client=fetch('cs16-client')
     apply(client, 'cs16-nano-4141.patch')
     apply(client, 'cs16-nano-spectator.patch')
+    apply(client/"3rdparty/mainui_cpp", "cs16-mainui-nano-menu.patch")
+
+    for patch in ("cs16-nano-look.patch", "cs16-nano-hud.patch"): apply(client,patch)
+    for header in ("nano-look.h", "nano-hud-scope.h", "nano-crosshair.h"): shutil.copy2(ROOT/"src"/header,client/"cl_dll"/header)

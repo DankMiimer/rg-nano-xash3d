@@ -1,0 +1,122 @@
+--- a/cl_dll/health.cpp
++++ b/cl_dll/health.cpp
+@@ -23,6 +23,7 @@
+ #include <cmath>
+ 
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ #include <string.h>
+@@ -179,6 +180,8 @@
+ 
+ int CHudHealth::Draw( float flTime )
+ {
++	NanoHudScope nanoScope("nano_hud_bottom", 0, 1);
++
+ 	int r, g, b;
+ 	int a = 0, x, y;
+ 	int HealthWidth;
+@@ -220,6 +223,7 @@
+ 
+ 		y = ScreenHeight - gHUD.m_iFontHeight - gHUD.m_iFontHeight / 2;
+ 		x = CrossWidth / 2;
++		nanoScope.Place(CrossWidth/2, y, CrossWidth + 4.1f*HealthWidth, y+Q_max(gHUD.m_iFontHeight+gHUD.m_iHudNumbersYOffset,gHUD.GetSpriteRect(m_HUD_cross).bottom-gHUD.GetSpriteRect(m_HUD_cross).top), 0, 1);
+ 
+ 		SPR_Set( gHUD.GetSprite( m_HUD_cross ), r, g, b );
+ 		SPR_DrawAdditive( 0, x, y, &gHUD.GetSpriteRect( m_HUD_cross ) );
+@@ -236,6 +240,7 @@
+ 		FillRGBA( x, y + gHUD.m_iHudNumbersYOffset, iWidth, iHeight, r, g, b, a );
+ 	}
+ 
++	nanoScope.Reset();
+ 	DrawDamage( flTime );
+ 	return DrawPain( flTime );
+ }
+--- a/cl_dll/battery.cpp
++++ b/cl_dll/battery.cpp
+@@ -19,6 +19,7 @@
+ //
+ 
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ 
+@@ -71,6 +72,8 @@
+ 
+ int CHudBattery::Draw( float flTime )
+ {
++	NanoHudScope nanoScope("nano_hud_bottom", 0, 1);
++
+ 	if( gHUD.m_iHideHUDDisplay & HIDEHUD_HEALTH )
+ 		return 1;
+ 
+@@ -115,6 +118,13 @@
+ 	else
+ 		x = ScreenWidth / 5;
+ 
++	int dw = gHUD.GetSpriteRect(gHUD.m_HUD_number_0).right-gHUD.GetSpriteRect(gHUD.m_HUD_number_0).left;
++	wrect_t health = gHUD.GetSpriteRect(gHUD.GetSpriteIndex("cross"));
++	float size = gEngfuncs.pfnGetCvarFloat("nano_hud_bottom");
++	nanoScope.Place(x, y-iOffset, x+(m_prc1->right-m_prc1->left)+3*dw,
++		y+Q_max(gHUD.m_iFontHeight+gHUD.m_iHudNumbersYOffset,m_prc1->bottom-m_prc1->top-iOffset), 0, 1,
++		6+((health.right-health.left)/2.0f+4.1f*dw)*size, 2);
++
+ 	// make sure we have the right sprite handles
+ 	if( !m_hSprite1 )
+ 		m_hSprite1 = gHUD.GetSprite( gHUD.GetSpriteIndex( "suit_empty" ) );
+--- a/cl_dll/flashlight.cpp
++++ b/cl_dll/flashlight.cpp
+@@ -19,6 +19,7 @@
+ //
+ 
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ 
+@@ -93,6 +94,8 @@
+ 
+ int CHudFlashlight::Draw( float flTime )
+ {
++	NanoHudScope nanoScope("nano_hud_side", 1, 0);
++
+ 	static bool show = ( gHUD.m_iHideHUDDisplay & ( HIDEHUD_FLASHLIGHT | HIDEHUD_ALL ) );
+ 	if( show != !( gHUD.m_iHideHUDDisplay & ( HIDEHUD_FLASHLIGHT | HIDEHUD_ALL ) ) )
+ 	{
+@@ -129,6 +132,8 @@
+ 	y = ( m_prc1->bottom - m_prc2->top ) / 2;
+ 	x = ScreenWidth - m_iWidth - m_iWidth / 2 ;
+ 
++	nanoScope.Place(x, y, ScreenWidth-m_iWidth/2+(m_prcBeam->right-m_prcBeam->left), y+(m_prc1->bottom-m_prc1->top), 1, 0);
++
+ 	// Draw the flashlight casing
+ 	SPR_Set( m_hSprite1, r, g, b );
+ 	SPR_DrawAdditive( 0,  x, y, m_prc1 );
+--- a/cl_dll/ammo.cpp
++++ b/cl_dll/ammo.cpp
+@@ -19,6 +19,7 @@
+ //
+ 
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ #include "pm_shared.h"
+@@ -873,6 +874,7 @@
+ 
+ 	WEAPON *pw = m_pWeapon; // shorthand
+ 
++	NanoHudScope nanoScope("nano_hud_bottom", 1, 1);
+ 	// SPR_Draw Ammo
+ 	if( ( pw->iAmmoType < 0 ) && ( pw->iAmmo2Type < 0 ) )
+ 		return 0;
+@@ -892,6 +894,7 @@
+ 
+ 	// Does this weapon have a clip?
+ 	y = ScreenHeight - gHUD.m_iFontHeight - gHUD.m_iFontHeight / 2;
++	nanoScope.Place(ScreenWidth-8*AmmoWidth-(m_pWeapon->rcAmmo.right-m_pWeapon->rcAmmo.left), y-(m_pWeapon->rcAmmo.bottom-m_pWeapon->rcAmmo.top)/8, ScreenWidth, y+gHUD.m_iHudNumbersYOffset+Q_max(gHUD.m_iFontHeight,(m_pWeapon->rcAmmo.bottom-m_pWeapon->rcAmmo.top)-(m_pWeapon->rcAmmo.bottom-m_pWeapon->rcAmmo.top)/8), 1, 1);
+ 	y += gHUD.m_iHudNumbersYOffset; // a1ba: fix HL25 HUD vertical inconsistensy
+ 
+ 	// Does weapon have any ammo at all?

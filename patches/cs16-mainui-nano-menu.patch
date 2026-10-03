@@ -1,0 +1,165 @@
+--- a/controls/PicButton.h
++++ b/controls/PicButton.h
+@@ -34,6 +34,7 @@
+ 	typedef CMenuBaseItem BaseClass;
+ 
+ 	CMenuPicButton();
++	void SetNanoScale(float scale);
+ 	bool KeyUp( int key ) override;
+ 	bool KeyDown( int key ) override;
+ 	void Draw( void ) override;
+--- a/controls/PicButton.cpp
++++ b/controls/PicButton.cpp
+@@ -99,6 +99,29 @@
+ 	'p', // PC_SPECTATE_GAMES,
+ };
+ 
++void CMenuPicButton::SetNanoScale(float scale)
++{
++    if (!(scale >= 1 && scale <= 3)) scale = 1;
++    SetCharSize(QM_DEFAULTFONT);
++    charSize = (int)(charSize * scale);
++    // Vector-font builds ignore DrawString's charH unless SCALE_FONTS is enabled.
++    // Rasterize the same font at its target size; CFontBuilder reuses matching fonts.
++    if (scale > 1) {
++        static HFont cached = 0;
++        static CBaseFont *cachedObject = NULL;
++        static int cachedTall = 0;
++        int tall = (int)(charSize*uiStatic.scaleY+0.5f);
++        if (!cachedObject || cachedTall != tall || g_FontMgr->GetIFontFromHandle(cached) != cachedObject) {
++            cached = CFontBuilder("Trebuchet MS", tall, 500).Create();
++            cachedObject = g_FontMgr->GetIFontFromHandle(cached);
++            cachedTall = tall;
++        }
++        font = cached;
++    }
++    size = Size((int)(uiStatic.buttons_draw_size.w * scale),
++        (int)(uiStatic.buttons_draw_size.h * scale));
++}
++
+ CMenuPicButton::CMenuPicButton() : BaseClass()
+ {
+ 	bEnableTransitions = true;
+@@ -216,7 +239,7 @@
+ void CMenuPicButton::DrawButton( int r, int g, int b, int a, wrect_t *rects, int state )
+ {
+ 	EngFuncs::PIC_Set( hPic, r, g, b, a );
+-	EngFuncs::PIC_DrawAdditive( m_scPos, uiStatic.buttons_draw_size.Scale(), &rects[state] );
++	EngFuncs::PIC_DrawAdditive( m_scPos, m_scSize, &rects[state] );
+ }
+ 
+ /*
+@@ -240,7 +263,7 @@
+ 	if( iOldState == BUTTON_NOFOCUS && state != BUTTON_NOFOCUS )
+ 		iFocusStartTime = uiStatic.realTime;
+ 
+-	if( szStatusText && FBitSet( iFlags, QMF_NOTIFY ) && !FBitSet( gMenu.m_gameinfo.flags, GFL_NOSKILLS ))
++	if( !(ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile")) && szStatusText && FBitSet( iFlags, QMF_NOTIFY ) && !FBitSet( gMenu.m_gameinfo.flags, GFL_NOSKILLS ))
+ 	{
+ 		Point coord;
+ 
+@@ -256,7 +279,7 @@
+ 
+ 	int a = (512 - (uiStatic.realTime - m_iLastFocusTime)) >> 1;
+ 
+-	if( hPic && !uiStatic.renderPicbuttonText )
++	if( hPic && !uiStatic.renderPicbuttonText && !(ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile")) )
+ 	{
+ 		int r, g, b;
+ 
+@@ -308,7 +331,7 @@
+ 			DrawButton( r, g, b, 255, rects, state );
+ 		}
+ 	}
+-	else if( !uiStatic.lowmemory )
++	else if( !uiStatic.lowmemory && !(ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile")) )
+ 	{
+ 		const uint heavy_blur_flags = ETF_NOSIZELIMIT | ETF_FORCECOL;
+ 		const uint light_blur_flags = ETF_NOSIZELIMIT | ETF_FORCECOL | ETF_ADDITIVE;
+--- a/menus/Main.cpp
++++ b/menus/Main.cpp
+@@ -41,7 +41,7 @@
+ class CMenuMain: public CMenuFramework
+ {
+ public:
+-	CMenuMain() : CMenuFramework( "CMenuMain" ) { }
++	CMenuMain() : CMenuFramework( "CMenuMain" ), nanoLayout(false) { }
+ 
+ 	bool KeyDown( int key ) override;
+ 
+@@ -51,6 +51,7 @@
+ 	void Think() override;
+ 
+ 	void VidInit(bool connected);
++	void NanoArrange(bool style);
+ 
+ 	void QuitDialogCb();
+ 	void DisconnectCb();
+@@ -81,6 +82,7 @@
+ 	// quit dialog
+ 	CMenuYesNoMessageBox dialog;
+ 
++	bool nanoLayout;
+ 	bool bTrainMap;
+ 	bool bCustomGame;
+ };
+@@ -397,8 +399,38 @@
+ 		saveRestore.SetPicture( PC_LOAD_GAME );
+ 		saveRestore.onReleased = UI_LoadGame_Menu;
+ 	}
+-}
+-
++    NanoArrange(true);
++}
++
++
++void CMenuMain::NanoArrange(bool style)
++{
++    // Native Nano profile: original button images/font, larger readable rows.
++    CMenuPicButton *rows[] = { &console, &disconnect, &resumeGame, &newGame,
++        &hazardCourse, &configuration, &saveRestore, &multiPlayer,
++        &customGame, &readme, &previews, &quit };
++    const bool nano = ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile");
++    console.SetVisibility(gpGlobals->developer != 0 && !nano);
++    nanoLayout = nano;
++    banner.SetVisibility(!nano);
++    movieBanner.SetVisibility(!nano);
++    animatedBanner.SetVisibility(!nano);
++    int row = 0, visible = 0;
++    for (unsigned i = 0; i < sizeof(rows)/sizeof(rows[0]); ++i) if (rows[i]->Parent() == this && rows[i]->IsVisible()) ++visible;
++    float rowPixels = visible ? (ScreenHeight - 16.0f) / visible : 22.0f;
++    if (rowPixels > 22.0f) rowPixels = 22.0f;
++    for (unsigned i = 0; i < sizeof(rows)/sizeof(rows[0]); ++i) {
++        if (style) rows[i]->SetNanoScale(nano ? 2.0f : 1.0f);
++        if (nano && rows[i]->Parent() == this && rows[i]->IsVisible()) {
++            const int gap = (int)(rowPixels / uiStatic.scaleY);
++            rows[i]->SetCoord(50, (int)(8.0f / uiStatic.scaleY - uiStatic.yOffset) + row * gap);
++            rows[i]->CalcPosition();
++            rows[i]->CalcSizes();
++            ++row;
++        }
++    }
++
++}
+ void CMenuMain::_VidInit()
+ {
+ 	VidInit( CL_IsActive() );
+@@ -406,7 +438,9 @@
+ 
+ void CMenuMain::Think()
+ {
+-	if( gpGlobals->developer )
++	bool nano = ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile");
++	if (nano != nanoLayout) { VidInit(CL_IsActive()); VidInitItems(); }
++	if( gpGlobals->developer && !nano )
+ 	{
+ 		if( !console.IsVisible( ))
+ 			console.Show();
+@@ -417,6 +451,7 @@
+ 			console.Hide();
+ 	}
+ 
++	if (nano) NanoArrange(false);
+ 	CMenuFramework::Think();
+ }
+ 

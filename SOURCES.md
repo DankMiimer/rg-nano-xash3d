@@ -40,3 +40,7 @@ There are no Steam credentials, account files, personal saves, RNG seeds, device
 `source-runtime.json` in each private native assembly records component/dependency hashes and that no external OPK was used. This documents the new build's provenance; it does not assert that it reproduces Sn3zee's implementation. Upstream credits remain intact, and no private port binary is reverse-engineered into the new engine.
 
 The Half-Life pin precedes the September 2026 freevgui SetPaintOffset extension, which the August engine does not implement. Engine and client revisions must be aligned when updating either.
+
+## Nano aiming and HUD changes
+
+`src/nano-look.h`, `nano-hud-transform.h`, `nano-hud-scope.h` and `nano-crosshair.h` are newly written helpers under MIT (notices in each file). Client, engine and menu patches retain the upstream files' licenses. Corresponding menu patches apply to both gitlink-pinned mainui submodules: FWGS engine's default menu and CS16Client's game-specific menu. No external HUD artwork, replacement font, controller mod or proprietary-game source was copied. The research document links behavior and layout references.

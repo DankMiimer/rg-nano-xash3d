@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
 from pathlib import Path
-import sys
-from fetch_sources import fetch, apply, run
+import sys, shutil
+from fetch_sources import fetch, apply, run, ROOT
 base=Path(sys.argv[1]).resolve()
 engine=fetch('xash3d',base)
-for patch in ('renderer-nano.patch','renderer-nano-triangles.patch','engine-musl-timer.patch','engine-fbdev-nano.patch','engine-linux-entropy.patch','engine-evdev-time64.patch','engine-fbdev-log.patch','engine-alsa-ring.patch'):
+for patch in ('renderer-nano.patch','renderer-nano-triangles.patch','engine-musl-timer.patch','engine-fbdev-nano.patch','engine-linux-entropy.patch','engine-evdev-time64.patch','engine-fbdev-log.patch','engine-alsa-ring.patch','engine-nano-hud.patch'):
     apply(engine,patch)
 run('git','-C',str(engine),'submodule','update','--init','--recursive','--depth','1',
     '3rdparty/mainui','3rdparty/vgui_support','3rdparty/library_suffix',
     '3rdparty/libbacktrace/libbacktrace','3rdparty/mbedtls/mbedtls',
     '3rdparty/opus/opus','3rdparty/opusfile/opusfile','3rdparty/extras/xash-extras','3rdparty/MultiEmulator')
+apply(engine/'3rdparty/mainui', 'mainui-nano-menu.patch')
+shutil.copy2(ROOT/'src/nano-hud-transform.h', engine/'engine/client/nano-hud-transform.h')
 hl=fetch('hlsdk',base)
+for patch in ('hl-nano-look.patch', 'hl-nano-hud.patch'): apply(hl,patch)
+for header in ('nano-look.h', 'nano-hud-scope.h'): shutil.copy2(ROOT/'src'/header,hl/'cl_dll'/header)
 run('git','-C',str(hl),'submodule','update','--init','--recursive','--depth','1')

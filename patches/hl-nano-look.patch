@@ -1,0 +1,70 @@
+--- a/cl_dll/input.cpp
++++ b/cl_dll/input.cpp
+@@ -13,6 +13,7 @@
+ // rights reserved.
+ 
+ #include "hud.h"
++#include "nano-look.h"
+ #include "cl_util.h"
+ #include "camera.h"
+ extern "C"
+@@ -744,11 +745,27 @@
+ Moves the local angle positions
+ ================
+ */
++static cvar_t *nano_look_accel, *nano_look_delay, *nano_look_ramp;
++static cvar_t *nano_look_max_yaw, *nano_look_fast;
++static NanoLookState nanoYaw = { 0, 0.0f };
++
+ void CL_AdjustAngles( float frametime, float *viewangles )
+ {
+ 	float speed;
+ 	float up, down;
+ 
++	// Camera yaw only. Movement and pitch retain their original code/rates.
++	int leftHeld = (in_left.state & 1) != 0;
++	int rightHeld = (in_right.state & 1) != 0;
++	int direction = (in_strafe.state & 1) ? 0 : rightHeld - leftHeld;
++	float yawRate = cl_yawspeed->value;
++	if (nano_look_accel && nano_look_accel->value) {
++		yawRate = NanoLookRate(&nanoYaw, direction,
++			(in_left.state | in_right.state) & 2, frametime,
++			nano_look_delay->value, nano_look_ramp->value,
++			cl_yawspeed->value, nano_look_max_yaw->value, nano_look_fast->value != 0);
++	} else { nanoYaw.direction = 0; nanoYaw.held = 0.0f; }
++
+ 	if( in_speed.state & 1 )
+ 	{
+ 		speed = frametime * cl_anglespeedkey->value;
+@@ -760,8 +777,8 @@
+ 
+ 	if( !( in_strafe.state & 1 ) )
+ 	{
+-		viewangles[YAW] -= speed * cl_yawspeed->value * CL_KeyState( &in_right );
+-		viewangles[YAW] += speed * cl_yawspeed->value * CL_KeyState( &in_left );
++		viewangles[YAW] -= speed * yawRate * CL_KeyState( &in_right );
++		viewangles[YAW] += speed * yawRate * CL_KeyState( &in_left );
+ 		viewangles[YAW] = anglemod( viewangles[YAW] );
+ 	}
+ 
+@@ -802,6 +819,8 @@
+ 	float spd;
+ 	vec3_t viewangles;
+ 	static vec3_t oldangles;
++
++	if (!active) { nanoYaw.direction = 0; nanoYaw.held = 0.0f; }
+ 
+ 	if( active )
+ 	{
+@@ -1126,6 +1145,11 @@
+ 	lookstrafe		= gEngfuncs.pfnRegisterVariable( "lookstrafe", "0", FCVAR_ARCHIVE );
+ 	lookspring		= gEngfuncs.pfnRegisterVariable( "lookspring", "0", FCVAR_ARCHIVE );
+ 	cl_anglespeedkey	= gEngfuncs.pfnRegisterVariable( "cl_anglespeedkey", "0.67", 0 );
++	nano_look_accel = gEngfuncs.pfnRegisterVariable("nano_look_accel", "0", FCVAR_ARCHIVE);
++	nano_look_delay = gEngfuncs.pfnRegisterVariable("nano_look_delay", "0.15", FCVAR_ARCHIVE);
++	nano_look_ramp = gEngfuncs.pfnRegisterVariable("nano_look_ramp", "0.75", FCVAR_ARCHIVE);
++	nano_look_max_yaw = gEngfuncs.pfnRegisterVariable("nano_look_max_yaw", "210", FCVAR_ARCHIVE);
++	nano_look_fast = gEngfuncs.pfnRegisterVariable("nano_look_fast", "0", 0);
+ 	cl_yawspeed		= gEngfuncs.pfnRegisterVariable( "cl_yawspeed", "210", 0 );
+ 	cl_pitchspeed		= gEngfuncs.pfnRegisterVariable( "cl_pitchspeed", "225", 0 );
+ 	cl_upspeed		= gEngfuncs.pfnRegisterVariable( "cl_upspeed", "320", 0 );
