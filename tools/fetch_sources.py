@@ -43,6 +43,7 @@ if __name__ == '__main__':
     client=fetch('cs16-client')
     apply(client, 'cs16-nano-4141.patch')
     apply(client, 'cs16-nano-spectator.patch')
+    apply(client/"3rdparty/ReGameDLL_CS", "cs16-nav-bsp-path.patch")
     apply(client/"3rdparty/mainui_cpp", "cs16-mainui-nano-menu.patch")
     for header in ("nano-menu-options.h", "nano-settings.h"):
         shutil.copy2(ROOT/"src"/header,client/"3rdparty/mainui_cpp/menus"/header)

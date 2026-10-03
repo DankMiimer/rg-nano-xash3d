@@ -1,0 +1,11 @@
+--- a/regamedll/game_shared/bot/nav_file.cpp
++++ b/regamedll/game_shared/bot/nav_file.cpp
+@@ -124,7 +124,7 @@
+ char *GetBspFilename()
+ {
+ 	static char bspFilename[256];
+-	Q_snprintf(bspFilename, sizeof(bspFilename), "maps\\%s.bsp", STRING(gpGlobals->mapname));
++	Q_snprintf(bspFilename, sizeof(bspFilename), "maps/%s.bsp", STRING(gpGlobals->mapname));
+ 	return bspFilename;
+ }
+ 
