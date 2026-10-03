@@ -62,7 +62,8 @@ exec "$ROOT/nano-run.sh" "$ROOT" {game}
     cfgdir.mkdir(parents=True,exist_ok=True)
     binds='bind "1" "+lookup"\nbind "3" "+lookdown"\nbind "2" "+attack2"\nbind "4" "savequick"\nbind "5" "loadquick"\nbind "p" "impulse 100"\nbind "f" "invnext"\n'
     if game=='cstrike':
-        binds=''.join(f'bind "{i}" "slot{i}"\n' for i in range(1,6))
+        binds=''.join(f'bind "{i}" "slot{i}"\n' for i in range(1,4))
+        binds+='bind "4" "savequick"\nbind "5" "loadquick"\nbind "6" "slot4"\nbind "7" "slot5"\n'
         binds+='cl_oldtouchmenus "0"\n_vgui_menus "0"\nhud_fastswitch "1"\nspec_pip_allow "0"\nspec_pip_internal "0"\ncl_corpsestay "5"\ncl_shadows "0"\nbind "p" "buy"\nbind "f" "autobuy"\n'
     controls=re.sub(r'bind "([A-Z])"([^\n]*)',lambda m: 'bind "'+m[1].lower()+'"'+m[2]+'\nbind "'+m[1]+'"'+m[2],common+binds)
     (cfgdir/'nano-controls.cfg').write_text(controls,newline='\n')
@@ -95,6 +96,8 @@ MAP FN+X     TO COMMAND brightness up
 MAP FN+B     TO COMMAND brightness down
 MAP FN+L     TO KEY     KEY_4
 MAP FN+R     TO KEY     KEY_5
+MAP FN+START+L TO KEY    KEY_6
+MAP FN+START+R TO KEY    KEY_7
 MAP FN+L+R   TO COMMAND /mnt/FunKey/Xash3D/nano-supervise-arm --stop /run/xash-nano.sock
 MAP FN+START+L+R TO COMMAND system_stats toggle
 '''

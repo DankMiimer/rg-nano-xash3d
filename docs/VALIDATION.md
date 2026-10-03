@@ -30,4 +30,8 @@ Checks were performed on an RG Nano with 56,164 KiB total RAM, SD-backed swap an
 - Logs capture stdout/stderr and RAM/swap/page-fault/CPU samples. Each engine/metric log retains two files of at most 512 KiB. Xash can handle a crash and exit zero, so `result.txt` also records crash signals printed by its handler.
 - Recovery resumes the owned game group, sends TERM and escalates to KILL after five seconds. Launcher cleanup restores the clock and default keys. This covers userspace hangs; it does not guarantee recovery from a kernel/driver lockup. There is no automatic freeze detector.
 
+- The user confirmed that Fn + L + R returns from source-built Counter-Strike to the launcher. Clock readback was 1008 MHz and the speaker amplifier returned to its idle state. Menu is a separate power-button event, so the earlier Fn + Start + Menu combination did not work and was replaced.
+- A subsequent ordinary Counter-Strike launch stayed running during a short unattended smoke check and restored 1008 MHz on supervised exit. Its latest renderer was not separately checked on the physical screen during that run.
+- Fn + L/R is reserved for quick-save/load in both profiles; Counter-Strike menu choices 4/5 moved to Fn + Start + L/R. The engine explicitly rejects multiplayer saves, so CS bot rounds do not gain save-state support from these bindings.
+
 HUD scale is 0.65, but some sprites still render incorrectly. Initial loads and some scenes use substantial swap. Full campaign completion, extended multiplayer play, repeated suspend/resume and long sessions remain unverified. See [ROADMAP.md](ROADMAP.md) for the next improvements.
