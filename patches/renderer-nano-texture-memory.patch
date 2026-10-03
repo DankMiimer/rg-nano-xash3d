@@ -1,0 +1,53 @@
+--- a/ref/soft/r_image.c
++++ b/ref/soft/r_image.c
+@@ -232,7 +232,19 @@
+ 
+ 	byte *buf = pic->buffer;
+ 
+-	int mipCount = 4;
++	/* UI, sprite and studio paths use mip zero only. Keep mips used by world surfaces. */
++	int mipCount = (tex->flags & TF_IMAGE) == TF_IMAGE ? 1 : 4;
++
++	/* Reuploads must replace owned storage rather than lose its pointers. */
++	for( uint j = 0; j < 4; j++ )
++	{
++		if( tex->pixels[j] ) Mem_Free( tex->pixels[j] );
++		tex->pixels[j] = NULL;
++	}
++	if( tex->alpha_pixels ) Mem_Free( tex->alpha_pixels );
++	tex->alpha_pixels = NULL;
++	tex->size = 0;
++	tex->numMips = 0;
+ 
+ 	// NOTE: only single uncompressed textures can be resamples, no mips, no layers, no sides
+ 	if((( pic->width != tex->width ) || ( pic->height != tex->height )))
+@@ -279,7 +291,7 @@
+ 
+ 		}
+ 
+-		if( mipCount > 1 )
++		if( j + 1 < (uint)mipCount )
+ 			GL_BuildMipMap( data, width, height, tex->depth, tex->flags );
+ 
+ 		tex->size += texsize;
+@@ -330,7 +342,7 @@
+ 			tex->flags &= ~TF_MAKELUMA;
+ 		}
+ 
+-		if( !FBitSet( tex->flags, TF_IMG_UPLOADED ) && FBitSet( tex->flags, TF_KEEP_SOURCE ))
++		if( !tex->original && FBitSet( tex->flags, TF_KEEP_SOURCE ))
+ 			tex->original = gEngfuncs.FS_CopyImage( pic ); // because current pic will be expanded to rgba
+ 
+ 		// we need to expand image into RGBA buffer
+--- a/ref/soft/r_studio.c
++++ b/ref/soft/r_studio.c
+@@ -2997,7 +2997,8 @@
+ static void R_StudioLoadTexture( model_t *mod, studiohdr_t *phdr, mstudiotexture_t *ptexture )
+ {
+ 	size_t    size;
+-	int       flags = 0;
++	/* The software studio sampler reads only mip zero. */
++	int       flags = TF_IMAGE;
+ 	char      texname[128], name[128], mdlname[128];
+ 	texture_t *tx = NULL;
+ 

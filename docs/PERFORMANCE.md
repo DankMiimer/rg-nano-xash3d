@@ -27,6 +27,8 @@ The phases are comparable short scenarios, not deterministic replays. Bots, tram
 
 The short runs reached approximately 40–43 MiB resident engine memory and 5–6 MiB minimum available system memory. Swap and major faults still occur. Swap-page counters are system-wide; engine major faults are per-process. Different counts between runs cannot be attributed solely to pacing. The subsequent [longer stability checks](STABILITY.md) cover CS deaths/spectating and HL saves/loads/level changes. Next attribute allocations and test later campaign scenes before changing texture or cache budgets.
 
+The subsequent [allocation investigation](MEMORY.md) found approximately 114 MiB of tracked CS payload, including 64 MiB in the renderer. Avoiding unused image/model mipmaps reduced that payload by about 10 MiB with base pixels preserved. Paging still occurs; separate short matches did not establish an FPS or loading-time improvement.
+
 During repeated testing, the firmware's `amixer` command once blocked in uninterruptible kernel sleep in `snd_soc_dapm_get_enum_double`, before engine startup. Restarting the Nano cleared it; later CS and HL launches succeeded. The root cause is unresolved. Userspace recovery cannot guarantee recovery from an audio-driver lockup.
 
 ## Repeat the measurements

@@ -9,6 +9,7 @@ Open-source launchers, controls, build recipes and source patches for running Ha
 - Separate Half-Life and Counter-Strike entries in Native games, with icons extracted locally from each game's `game.ico`.
 - D-pad walks/turns; hold R for vertical look and strafing; precise camera speed by default, hold L for three times faster look. X shoots; A uses; B jumps; Y reloads.
 - Source-built profile adds horizontal hold acceleration, independently scaled original HUD groups, half-size CS radar, a pixel-symmetric crosshair and larger main/pause/settings menus on the Nano's 240×240 display.
+- Source-built renderer avoids unused menu/sprite/model mipmaps and replaces texture-update storage correctly, reducing CS tracked allocations by approximately 10 MiB in the tested scene. Original base pixels and world mipmaps are retained; see [memory measurements](docs/MEMORY.md).
 - Software profiles explicitly disable VSync so the configured 30 FPS cap is respected.
 - Source-built **Options → Nano settings** provides FPS-limit/frame-sleep toggles, an FPS slider, camera speed/acceleration controls and separate HUD size sliders. Choices save per game; see [Nano settings](docs/NANO-SETTINGS.md).
 - Launchers set 1200 MHz and restore 1008 MHz when the game process exits.
@@ -114,6 +115,8 @@ python3 tests/test_nano_menu.py
 python3 tests/test_nano_settings.py
 python3 tests/test_nano_options.py
 python3 tests/test_nano_frame_stats.py
+python3 tests/test_nano_texture_memory.py
+python3 tests/test_nano_memory_report.py
 ```
 
 ## Check renderer clipping

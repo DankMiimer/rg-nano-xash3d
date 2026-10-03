@@ -15,6 +15,8 @@ apply(engine/'3rdparty/mainui', 'mainui-nano-menu.patch')
 for header in ('nano-menu-options.h', 'nano-settings.h'):
     shutil.copy2(ROOT/'src'/header,engine/'3rdparty/mainui/menus'/header)
 apply(engine, 'engine-nano-profile.patch')
+apply(engine, 'engine-nano-memory-report.patch')
+apply(engine, 'renderer-nano-texture-memory.patch')
 shutil.copy2(ROOT/'src/nano-frame-stats.h', engine/'engine/common/nano-frame-stats.h')
 shutil.copy2(ROOT/'src/nano-hud-transform.h', engine/'engine/client/nano-hud-transform.h')
 hl=fetch('hlsdk',base)
