@@ -12,6 +12,8 @@ run('git','-C',str(engine),'submodule','update','--init','--recursive','--depth'
     '3rdparty/libbacktrace/libbacktrace','3rdparty/mbedtls/mbedtls',
     '3rdparty/opus/opus','3rdparty/opusfile/opusfile','3rdparty/extras/xash-extras','3rdparty/MultiEmulator')
 apply(engine/'3rdparty/mainui', 'mainui-nano-menu.patch')
+apply(engine, 'engine-nano-profile.patch')
+shutil.copy2(ROOT/'src/nano-frame-stats.h', engine/'engine/common/nano-frame-stats.h')
 shutil.copy2(ROOT/'src/nano-hud-transform.h', engine/'engine/client/nano-hud-transform.h')
 hl=fetch('hlsdk',base)
 for patch in ('hl-nano-look.patch', 'hl-nano-hud.patch'): apply(hl,patch)

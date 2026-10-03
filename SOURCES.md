@@ -43,4 +43,6 @@ The Half-Life pin precedes the September 2026 freevgui SetPaintOffset extension,
 
 ## Nano aiming and HUD changes
 
-`src/nano-look.h`, `nano-hud-transform.h`, `nano-hud-scope.h` and `nano-crosshair.h` are newly written helpers under MIT (notices in each file). Client, engine and menu patches retain the upstream files' licenses. Corresponding menu patches apply to both gitlink-pinned mainui submodules: FWGS engine's default menu and CS16Client's game-specific menu. No external HUD artwork, replacement font, controller mod or proprietary-game source was copied. The research document links behavior and layout references.
+`src/nano-look.h`, `nano-hud-transform.h`, `nano-hud-scope.h`, `nano-crosshair.h` and `nano-frame-stats.h` are newly written helpers under MIT (notices in each file). Client, engine and menu patches retain the upstream files' licenses. Corresponding menu patches apply to both gitlink-pinned mainui submodules: FWGS engine's default menu and CS16Client's game-specific menu. No external HUD artwork, replacement font, controller mod or proprietary-game source was copied. The research document links behavior and layout references.
+
+The bounded frame statistics helper records elapsed frame intervals and processing time through an opt-in engine hook. It does not copy an external profiler. Menu settings changes rearrange the existing controls and reuse their original callbacks and menu face.

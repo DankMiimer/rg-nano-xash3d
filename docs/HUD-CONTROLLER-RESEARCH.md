@@ -1,6 +1,6 @@
 # Controller and original-style HUD research
 
-Research date: 2026-10-03. The target is the Nano's 240x240 software-rendered display and digital buttons. The user's preference is original artwork and recognizable placement, with individual elements made larger or smaller as needed. Independent HUD transforms and horizontal camera acceleration are now implemented in the source-built runtime. Main/pause menu changes apply to both the engine menu and Counter-Strike's separate menu module. Settings submenus remain a separate layout task.
+Research date: 2026-10-03. The target is the Nano's 240x240 software-rendered display and digital buttons. The user's preference is original artwork and recognizable placement, with individual elements made larger or smaller as needed. Independent HUD transforms and horizontal camera acceleration are now implemented in the source-built runtime. Main/pause and common settings changes apply to both the engine menu and Counter-Strike's separate menu module. Specialized dialogs remain a separate layout task.
 
 ## Candidates worth using
 
@@ -46,10 +46,10 @@ The CS crosshair is laid out directly in physical pixels to avoid truncation thr
 
 ## Remaining layout and verification work
 
-1. Adapt settings submenus with suitable row spacing/scrolling, rather than only enlarging their fonts.
+1. Common settings now use readable original-font text and focus scrolling. Adapt the remaining specialized dialogs and touch/gamepad editors; verify long/localized labels on hardware.
 2. Verify Half-Life with suit, armor, weapon/ammo and damage indicators. Its 320-pixel sprite set differs from CS's 640-pixel set, so compare physical readability independently.
 3. Check extreme values, money deltas, empty/full armor, primary/secondary ammo, radar contacts, long team/buy text and death/respawn. Preserve original colors, fades and artwork.
-4. Measure a repeatable CS round and HL campaign scene for frame-time, memory/swap and audio stalls at 1200 MHz. Optimize only demonstrated bottlenecks.
+4. Initial CS/tram measurements and reduced frame-wait CPU use are documented in [PERFORMANCE.md](PERFORMANCE.md). Extend measurement to loading, level changes and repeated launches at 1200 MHz, then investigate memory/cache and audio stalls.
 5. Keep source-built entries separate until parity and extended stability are established; publish source/recipes without game assets, extracted icons or unlicensed fonts/navigation.
 
 Run `NANO_NATIVE_DIR=/path/to/native-build python3 tests/test_nano_look_hud.py` under Linux after fetching/building. It compiles actual client yaw functions and engine HUD functions with AddressSanitizer/UndefinedBehaviorSanitizer, and exercises frame rates, reversals, pitch/strafe invariance, nested scopes, edge placement, symmetric crosshair geometry normalized sprite UVs, full health/armor alongside three-digit ammo, top-edge money and death-notice clearance.

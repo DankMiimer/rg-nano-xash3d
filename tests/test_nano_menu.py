@@ -17,7 +17,7 @@ for name,base in [('hl',native/'xash3d/3rdparty/mainui'),('cs',root/'upstream/cs
 struct Size { int w,h; Size(int x=0,int y=0):w(x),h(y){} };
 struct Point { int x,y; };
 static float ScreenWidth=240, ScreenHeight=240;
-static struct { float scaleY,yOffset; Size buttons_draw_size; } uiStatic={240.0f/1024,128,Size(256,32)};
+static struct { float scaleX,scaleY,yOffset; Size buttons_draw_size; } uiStatic={240.0f/1024,240.0f/1024,128,Size(256,32)};
 static struct { int developer; } globals={1},*gpGlobals=&globals;
 struct EngFuncs { static float GetCvarFloat(const char *) { return 1; } };
 typedef int HFont;
@@ -33,18 +33,23 @@ struct CFontBuilder {
 };
 #define QM_DEFAULTFONT 0
 struct CMenuPicButton {
-    int charSize=26; HFont font=0; Size size; Point pos={0,0}; bool visible=true; void *parent=NULL;
+    int charSize=26; HFont font=0; Size size; Point pos={0,0},rendered={0,0}; bool visible=true; void *parent=NULL;
     void SetCharSize(int){charSize=26;font=1;}
     void SetNanoScale(float);
     bool IsVisible(){return visible;}
     void SetVisibility(bool v){visible=v;}
     void *Parent(){return parent;}
     void SetCoord(int x,int y){pos.x=x;pos.y=y;}
-    void CalcPosition(){}
+    void CalcPosition(){rendered=pos;}
     void CalcSizes(){}
 };
 struct CMenuMain {
     bool nanoLayout=false;
+    Point pos={0,128}; Size size={1024,768};
+    void SetCoord(int x,int y){pos={x,y};}
+    void SetSize(int w,int h){size=Size(w,h);}
+    void CalcPosition(){}
+    void CalcSizes(){}
     CMenuPicButton banner,movieBanner,animatedBanner;
     CMenuPicButton console,disconnect,resumeGame,newGame,hazardCourse,configuration,saveRestore,multiPlayer,customGame,readme,previews,quit;
     void NanoArrange(bool);
@@ -69,7 +74,10 @@ int main(){
     float previous=-1;
     for(auto row:rows){
         if(!row->visible)continue;
-        float top=(row->pos.y+uiStatic.yOffset)*uiStatic.scaleY;
+        // The actual base item wraps a negative position from the parent's bottom.
+        float local=row->pos.y*uiStatic.scaleY;
+        if(local<0)local+=menu.size.h*uiStatic.scaleY;
+        float top=local+menu.pos.y*uiStatic.scaleY;
         float height=row->size.h*uiStatic.scaleY;
         assert(top>=7 && top+height<=240 && top>previous);
         previous=top+height;

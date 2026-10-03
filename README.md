@@ -8,7 +8,8 @@ Open-source launchers, controls, build recipes and source patches for running Ha
 
 - Separate Half-Life and Counter-Strike entries in Native games, with icons extracted locally from each game's `game.ico`.
 - D-pad walks/turns; hold R for vertical look and strafing; precise camera speed by default, hold L for three times faster look. X shoots; A uses; B jumps; Y reloads.
-- Source-built profile adds horizontal hold acceleration, independently scaled original HUD groups, half-size CS radar, a pixel-symmetric crosshair and larger main/pause menus on the Nano's 240×240 display.
+- Source-built profile adds horizontal hold acceleration, independently scaled original HUD groups, half-size CS radar, a pixel-symmetric crosshair and larger main/pause/settings menus on the Nano's 240×240 display.
+- Software profiles explicitly disable VSync so the configured 30 FPS cap is respected.
 - Launchers set 1200 MHz and restore 1008 MHz when the game process exits.
 - Half-Life launches the opening campaign directly with the current launcher settings.
 - Counter-Strike launches an offline de_dust match with two easy bots, one-minute rounds and spectator picture-in-picture prevented from being re-enabled by the Use button.
@@ -16,7 +17,7 @@ Open-source launchers, controls, build recipes and source patches for running Ha
 - The user confirmed menu navigation and sound on the established ports, and movement, shooting and sound on source-built Counter-Strike.
 - Software renderer permits 4096 textures and clips off-screen HUD graphics before accessing the framebuffer.
 
-See [CONTROLS.md](docs/CONTROLS.md), [VALIDATION.md](docs/VALIDATION.md) and the [controller/HUD reuse research](docs/HUD-CONTROLLER-RESEARCH.md). These remain experimental ports: settings menu layouts and extended campaign/multiplayer stability remain under development.
+See [CONTROLS.md](docs/CONTROLS.md), [VALIDATION.md](docs/VALIDATION.md) and the [controller/HUD reuse research](docs/HUD-CONTROLLER-RESEARCH.md). These remain experimental ports: specialized dialogs and extended campaign/multiplayer stability remain under development.
 
 ## Build the source components
 
@@ -100,12 +101,17 @@ At startup, the launcher reapplies saved system volume and enables the speaker a
 
 Diagnostics are under `diagnostics/valve` or `diagnostics/cstrike` inside the runtime. `engine.log` captures output, `metrics.csv` samples RAM/swap/page faults/CPU counters every two seconds, and `result.txt` records exit status, termination signals and crash signals printed by Xash's own handler (which can otherwise exit with code zero). Engine and metric logs keep two files of at most 512 KiB each. There is no automatic freeze detector; recovery is user-triggered.
 
+Source-built games also sleep between capped frames to reduce busy-waiting. Optional `NANO_PROFILE=1` reports frame timing without an on-screen overlay. See [performance measurements and remaining limits](docs/PERFORMANCE.md).
+
 ```sh
 gcc -O2 -Wall -Wextra -Werror src/nano-supervise.c -o /var/tmp/rg-nano-supervise-host
 python3 tests/test_supervisor.py
 # After build-native.sh (uses NANO_NATIVE_DIR if set):
 python3 tests/test_alsa_ring.py
 python3 tests/test_renderer_triangles.py
+python3 tests/test_nano_menu.py
+python3 tests/test_nano_settings.py
+python3 tests/test_nano_frame_stats.py
 ```
 
 ## Check renderer clipping

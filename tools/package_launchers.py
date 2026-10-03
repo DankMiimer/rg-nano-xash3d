@@ -65,6 +65,9 @@ touch_enable "0"
 joy_enable "0"
 cmd_scripting "1"
 fps_max "30"
+// The software framebuffer has no VSync wait; retain the explicit frame cap.
+gl_vsync "0"
+set nano_frame_sleep "1"
 scr_drawversion "0"
 name "RG Nano"
 '''

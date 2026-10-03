@@ -1,0 +1,54 @@
+--- a/engine/common/host.c
++++ b/engine/common/host.c
+@@ -38,6 +38,10 @@
+ #include "tests.h"
+ #include "library.h"
+ #include "platform/platform.h"
++#include "nano-frame-stats.h"
++static NanoFrameStats nanoFrames;
++static CVAR_DEFINE_AUTO( nano_frame_sleep, "0", 0, "Sleep between capped Nano frames" );
++static CVAR_DEFINE_AUTO( nano_profile, "0", 0, "Report bounded Nano frame timing summaries" );
+ 
+ host_parm_t host;	// host parms
+ static jmp_buf return_from_main_buf;
+@@ -546,6 +550,15 @@
+ 	else
+ 		targetframetime = ( 1.0 / fps );
+ 
++    if (nano_frame_sleep.value && !Host_IsDedicated()) {
++        if (dt<targetframetime*scale) {
++            unsigned long nanoseconds=NanoFrameSleepNS(dt,targetframetime,scale);
++            if (nanoseconds) Platform_NanoSleep(nanoseconds);
++            return false;
++        }
++        return true;
++    }
++
+ 	int sleep = Host_CalcSleep();
+ 	if( sleep <= 0 ) // no sleeps between frames, much simpler code
+ 	{
+@@ -666,6 +679,15 @@
+ 
+ 	host.framecount++;
+ 	host.pureframetime = Platform_DoubleTime() - t1;
++    if (nano_profile.value) {
++        if (NanoFrameAdd(&nanoFrames,t1,host.pureframetime)) {
++            NanoFrameSummary stats=NanoFrameSummarize(&nanoFrames);
++            fprintf(stderr,"nano-profile: state=%d cap=%.0f vsync=%.0f frames=%u fps=%.2f median_ms=%.2f p95_ms=%.2f max_ms=%.2f work_mean_ms=%.2f slow50=%u\n",
++                cls.state,host_maxfps.value,gl_vsync.value,stats.count,stats.fps,stats.medianMS,stats.p95MS,stats.maxMS,stats.workMeanMS,stats.slow50);
++            NanoFrameReset(&nanoFrames,t1,1);
++        }
++    } else if (nanoFrames.havePrevious) NanoFrameReset(&nanoFrames,0,0);
++
+ }
+ 
+ /*
+@@ -1186,6 +1208,8 @@
+ 	Cvar_RegisterVariable( &host_allow_materials );
+ 	Cvar_RegisterVariable( &host_serverstate );
+ 	Cvar_RegisterVariable( &host_maxfps );
++	Cvar_RegisterVariable( &nano_profile );
++	Cvar_RegisterVariable( &nano_frame_sleep );
+ 	Cvar_RegisterVariable( &fps_override );
+ 	Cvar_RegisterVariable( &host_framerate );
+ 	Cvar_RegisterVariable( &host_sleeptime );

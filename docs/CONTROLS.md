@@ -35,3 +35,7 @@ System shortcuts retain their usual positions: Fn + A/Y raises/lowers volume, Fn
 Hold **Fn + L + R** to stop a stuck game through the supervisor. Allow up to five seconds for forced shutdown and a little longer for launcher cleanup. The same shortcut is used by the isolated native test runtime.
 
 Fn + Start + L + R toggles system stats. The Nano firmware processes Menu as a standalone power-button event; it cannot be included in these GPIO button combinations.
+
+## Source-built settings menus
+
+The main settings categories and Audio, Video options/modes, keyboard controls, advanced controls and input-device pages use readable 12-pixel text and one column. Up/Down selects rows; pages scroll to keep the selected control fully visible. Left/Right adjusts sliders and choices. Use the existing confirm button to toggle a checkbox or activate Done; Menu goes back. The key-binding table keeps its own row navigation. Specialized dialogs and touch/gamepad editing pages still use their upstream layouts.

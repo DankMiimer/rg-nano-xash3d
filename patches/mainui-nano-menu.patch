@@ -1,6 +1,198 @@
+--- a/controls/BaseItem.h
++++ b/controls/BaseItem.h
+@@ -154,6 +154,10 @@
+ 	inline Size  GetRenderSize()     const { return m_scSize; }
+ 
+ 	void SetCharSize( EFontSizes fs );
++	void SetNanoFont();
++    enum NanoRowKind { NANO_ROW_NONE, NANO_ROW_BUTTON, NANO_ROW_SLIDER, NANO_ROW_SPIN,
++        NANO_ROW_CHECK, NANO_ROW_TABLE, NANO_ROW_ACTION };
++    virtual NanoRowKind NanoRowType() const { return NANO_ROW_NONE; }
+ 
+ 	inline void SetNameAndStatus( const char *name, const char *status, const char *tag = NULL )
+ 	{
+--- a/controls/BaseItem.cpp
++++ b/controls/BaseItem.cpp
+@@ -95,6 +95,20 @@
+ bool CMenuBaseItem::KeyDown( int key )
+ {
+ 	return false;
++}
++
++
++void CMenuBaseItem::SetNanoFont()
++{
++    // Rasterize the existing menu face at 12 physical pixels, and reuse it.
++    static HFont cached = 0;
++    static CBaseFont *cachedObject = NULL;
++    if (!cachedObject || g_FontMgr->GetIFontFromHandle(cached) != cachedObject) {
++        cached = CFontBuilder("Trebuchet MS", 12, 500).Create();
++        cachedObject = g_FontMgr->GetIFontFromHandle(cached);
++    }
++    font = cached;
++    charSize = (int)ceilf(12.0f/uiStatic.scaleY);
+ }
+ 
+ void CMenuBaseItem::SetCharSize( EFontSizes fs )
+--- a/controls/Framework.h
++++ b/controls/Framework.h
+@@ -67,6 +67,10 @@
+ 	} banner;
+ 
+ protected:
++	bool NanoSettingsActive() const;
++	void NanoArrangeSettings();
++	bool nanoSettings;
++	int nanoScroll;
+ 	EAnimation bannerAnimDirection;
+ 	Rect bannerRects[2];
+ 
+--- a/controls/Framework.cpp
++++ b/controls/Framework.cpp
+@@ -14,6 +14,11 @@
+ */
+ #include "Framework.h"
+ #include "PicButton.h"
++#include "Slider.h"
++#include "SpinControl.h"
++#include "CheckBox.h"
++#include "Table.h"
++#include "Action.h"
+ 
+ // menu banners used fiexed rectangle (virtual screenspace at 640x480)
+ #define UI_BANNER_POSX		72
+@@ -23,6 +28,12 @@
+ 
+ CMenuFramework::CMenuFramework( const char *name ) : BaseClass( name )
+ {
++	nanoSettings = !strcmp(name,"CMenuOptions") || !strcmp(name,"CMenuAudio") ||
++        !strcmp(name,"CMenuVideo") || !strcmp(name,"CMenuVidOptions") ||
++        !strcmp(name,"CMenuVidModes") || !strcmp(name,"CMenuControls") ||
++        !strcmp(name,"CAdvancedControls") || !strcmp(name,"CMenuGameOptions") ||
++        !strcmp(name,"CMenuInputDevices");
++    nanoScroll = 0;
+ 	memset( m_apBtns, 0, sizeof( m_apBtns ) );
+ 	m_iBtnsNum = 0;
+ 	bannerAnimDirection = ANIM_NO;
+@@ -49,7 +60,14 @@
+ 	static CMenuBaseItem *lastItem;
+ 	CMenuBaseItem *item;
+ 
++	NanoArrangeSettings();
+ 	BaseClass::Draw();
++	if (NanoSettingsActive()) {
++		CMenuBaseItem *focus=ItemAtCursor();
++		if (focus) UI_DrawString(focus->font, Point(8,ScreenHeight-15), Size(ScreenWidth-16,13),
++			"Up/Down select  Left/Right adjust", uiColorHelp, 12, QM_LEFT, ETF_FORCECOL);
++		return;
++	}
+ 
+ 	item = ItemAtCursor();
+ 	// a1ba: maybe this should be somewhere else?
+@@ -101,6 +119,8 @@
+ 	size.w = uiStatic.width;
+ 	size.h = 768;
+ 	BaseClass::VidInit();
++	nanoScroll=0;
++	NanoArrangeSettings();
+ }
+ 
+ CMenuPicButton * CMenuFramework::AddButton(const char *szName, const char *szStatus, EDefaultBtns buttonPicId, CEventCallback onReleased, int iFlags)
+@@ -163,6 +183,7 @@
+ bool CMenuFramework::KeyDown( int key )
+ {
+ 	bool b = BaseClass::KeyDown( key );
++	NanoArrangeSettings();
+ 
+ 	if( UI::Key::IsEscape( key ))
+ 	{
+@@ -261,3 +282,78 @@
+ 	Draw( m_scPos, m_scSize );
+ }
+ 
++
++bool CMenuFramework::NanoSettingsActive() const
++{
++    return nanoSettings && ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile");
++}
++
++void CMenuFramework::NanoArrangeSettings()
++{
++    if (!NanoSettingsActive()) return;
++    // Root coordinates cover the full square screen; rows use physical-pixel dimensions.
++    SetCoord(0, 0);
++    SetSize((int)ceilf(ScreenWidth/uiStatic.scaleX), (int)ceilf(ScreenHeight/uiStatic.scaleY));
++    CalcPosition(); CalcSizes();
++    banner.Hide();
++    DisableTransition();
++    CMenuBaseItem *rows[64];
++    int heights[64], count=0, total=0, focusTop=-1, focusHeight=0;
++    for (int i=0; i<ItemCount() && count<64; ++i) {
++        CMenuBaseItem *item=GetItemByIndex(i);
++        if (item==&banner || !item->IsVisible()) continue;
++        bool button=item->NanoRowType()==NANO_ROW_BUTTON;
++        bool slider=item->NanoRowType()==NANO_ROW_SLIDER;
++        bool spin=item->NanoRowType()==NANO_ROW_SPIN;
++        bool check=item->NanoRowType()==NANO_ROW_CHECK;
++        bool table=item->NanoRowType()==NANO_ROW_TABLE;
++        bool action=item->NanoRowType()==NANO_ROW_ACTION;
++        if (!(button || slider || spin || check || table || action)) {
++            // Decorative previews do not compete with full-width settings controls.
++            if (item->iFlags & QMF_INACTIVE) item->iFlags |= QMF_HIDDENBYPARENT;
++            continue;
++        }
++        item->iFlags &= ~QMF_NOTIFY;
++        item->SetNanoFont();
++        int height=table ? 142 : (slider || spin) ? 42 : 24;
++        if (item==ItemAtCursor()) { focusTop=total; focusHeight=height; }
++        rows[count]=item; heights[count++]=height; total+=height;
++    }
++    // Show() initially selects the old banner slot; select a real control instead.
++    if (focusTop<0) {
++        int rowTop=0;
++        for (int i=0; i<count; ++i) {
++            if (!(rows[i]->iFlags & (QMF_INACTIVE|QMF_GRAYED))) {
++                SetCursorToItem(*rows[i]); focusTop=rowTop; focusHeight=heights[i]; break;
++            }
++            rowTop+=heights[i];
++        }
++    }
++    int viewport=ScreenHeight-30;
++    if (focusTop>=0) {
++        if (focusTop<nanoScroll) nanoScroll=focusTop;
++        if (focusTop+focusHeight>nanoScroll+viewport) nanoScroll=focusTop+focusHeight-viewport;
++    }
++    nanoScroll=bound(0,nanoScroll,Q_max(0,total-viewport));
++    int top=8-nanoScroll;
++    for (int i=0; i<count; ++i) {
++        CMenuBaseItem *item=rows[i];
++        bool slider=item->NanoRowType()==NANO_ROW_SLIDER;
++        bool spin=item->NanoRowType()==NANO_ROW_SPIN;
++        bool check=item->NanoRowType()==NANO_ROW_CHECK;
++        bool table=item->NanoRowType()==NANO_ROW_TABLE;
++        bool visible=top>=8 && top+heights[i]<=ScreenHeight-22;
++        if (visible) item->iFlags &= ~QMF_HIDDENBYPARENT;
++        else item->iFlags |= QMF_HIDDENBYPARENT;
++        int y=visible ? top+(slider || spin ? 18 : 0) : 8;
++        int width=check ? 14 : ScreenWidth-20;
++        int height=check ? 14 : table ? heights[i]-6 : slider || spin ? 16 : 20;
++        Point position((int)ceilf(10.0f/uiStatic.scaleX), (int)ceilf(y/uiStatic.scaleY));
++        Size extent((int)ceilf(width/uiStatic.scaleX),(int)ceilf(height/uiStatic.scaleY));
++        if (item->pos.x!=position.x || item->pos.y!=position.y || item->size.w!=extent.w || item->size.h!=extent.h) {
++            item->pos=position; item->size=extent;
++            item->VidInit();
++        }
++        top+=heights[i];
++    }
++}
 --- a/controls/PicButton.h
 +++ b/controls/PicButton.h
-@@ -34,6 +34,7 @@
+@@ -31,9 +31,12 @@
+ class CMenuPicButton : public CMenuBaseItem
+ {
+ public:
++    NanoRowKind NanoRowType() const override { return NANO_ROW_BUTTON; }
++
  	typedef CMenuBaseItem BaseClass;
  
  	CMenuPicButton();
@@ -76,6 +268,61 @@
  	{
  		const uint heavy_blur_flags = ETF_NOSIZELIMIT | ETF_FORCECOL;
  		const uint light_blur_flags = ETF_NOSIZELIMIT | ETF_FORCECOL | ETF_ADDITIVE;
+--- a/controls/Slider.h
++++ b/controls/Slider.h
+@@ -23,6 +23,8 @@
+ class CMenuSlider : public CMenuEditable
+ {
+ public:
++    NanoRowKind NanoRowType() const override { return NANO_ROW_SLIDER; }
++
+ 	typedef CMenuEditable BaseClass;
+ 
+ 	CMenuSlider();
+--- a/controls/SpinControl.h
++++ b/controls/SpinControl.h
+@@ -23,6 +23,8 @@
+ class CMenuSpinControl : public CMenuEditable
+ {
+ public:
++    NanoRowKind NanoRowType() const override { return NANO_ROW_SPIN; }
++
+ 	typedef CMenuEditable BaseClass;
+ 
+ 	CMenuSpinControl();
+--- a/controls/CheckBox.h
++++ b/controls/CheckBox.h
+@@ -28,6 +28,8 @@
+ class CMenuCheckBox : public CMenuEditable
+ {
+ public:
++    NanoRowKind NanoRowType() const override { return NANO_ROW_CHECK; }
++
+ 	typedef CMenuEditable BaseClass;
+ 
+ 	CMenuCheckBox();
+--- a/controls/Table.h
++++ b/controls/Table.h
+@@ -45,6 +45,8 @@
+ class CMenuTable : public CMenuBaseItem
+ {
+ public:
++    NanoRowKind NanoRowType() const override { return NANO_ROW_TABLE; }
++
+ 	typedef CMenuBaseItem BaseClass;
+ 
+ 	CMenuTable();
+--- a/controls/Action.h
++++ b/controls/Action.h
+@@ -21,6 +21,8 @@
+ class CMenuAction : public CMenuBaseItem
+ {
+ public:
++    NanoRowKind NanoRowType() const override { return NANO_ROW_ACTION; }
++
+ 	typedef CMenuBaseItem BaseClass;
+ 
+ 	CMenuAction();
 --- a/menus/Main.cpp
 +++ b/menus/Main.cpp
 @@ -41,7 +41,7 @@
@@ -103,7 +350,7 @@
  	bool bTrainMap;
  	bool bCustomGame;
  };
-@@ -384,8 +386,38 @@
+@@ -384,8 +386,44 @@
  		saveRestore.SetPicture( PC_LOAD_GAME );
  		saveRestore.onReleased = UI_LoadGame_Menu;
  	}
@@ -125,6 +372,12 @@
 +    banner.SetVisibility(!nano);
 +    movieBanner.SetVisibility(!nano);
 +    animatedBanner.SetVisibility(!nano);
++    if (nano) {
++        // Avoid negative child coordinates: they anchor from the parent's bottom.
++        SetCoord(0, 0);
++        SetSize((int)ceilf(ScreenWidth/uiStatic.scaleX), (int)ceilf(ScreenHeight/uiStatic.scaleY));
++        CalcPosition(); CalcSizes();
++    }
 +    int row = 0, visible = 0;
 +    for (unsigned i = 0; i < sizeof(rows)/sizeof(rows[0]); ++i) if (rows[i]->Parent() == this && rows[i]->IsVisible()) ++visible;
 +    float rowPixels = visible ? (ScreenHeight - 16.0f) / visible : 22.0f;
@@ -133,7 +386,7 @@
 +        if (style) rows[i]->SetNanoScale(nano ? 2.0f : 1.0f);
 +        if (nano && rows[i]->Parent() == this && rows[i]->IsVisible()) {
 +            const int gap = (int)(rowPixels / uiStatic.scaleY);
-+            rows[i]->SetCoord(50, (int)(8.0f / uiStatic.scaleY - uiStatic.yOffset) + row * gap);
++            rows[i]->SetCoord(50, (int)ceilf(8.0f / uiStatic.scaleY) + row * gap);
 +            rows[i]->CalcPosition();
 +            rows[i]->CalcSizes();
 +            ++row;
@@ -144,7 +397,7 @@
  void CMenuMain::_VidInit()
  {
  	VidInit( CL_IsActive() );
-@@ -393,7 +425,9 @@
+@@ -393,7 +431,9 @@
  
  void CMenuMain::Think()
  {
@@ -155,7 +408,7 @@
  	{
  		if( !console.IsVisible( ))
  			console.Show();
-@@ -404,6 +438,7 @@
+@@ -404,6 +444,7 @@
  			console.Hide();
  	}
  
