@@ -19,12 +19,15 @@
 #include <math.h>
 struct NanoCrosshairRect { int x, y, w, h; };
 static void NanoCrosshairRects(int width, int height, float gap, float length,
-    NanoCrosshairRect rects[4])
+    NanoCrosshairRect rects[4], float size = 1.0f)
 {
     int cx = width/2, cy = height/2;
     int g = (int)floorf(gap+0.5f), l = (int)floorf(length+0.5f);
     if (g < 3) g = 3;
     if (l < 5) l = 5;
+    if (!(size >= 0.5f && size <= 1.5f)) size = 1.0f;
+    g = (int)floorf(g*size+0.5f);
+    l = (int)floorf(l*size+0.5f);
     rects[0] = {cx-g-l, cy, l, 1};
     rects[1] = {cx+g+1, cy, l, 1};
     rects[2] = {cx, cy-g-l, 1, l};

@@ -94,6 +94,8 @@ death=(cs/'death.cpp').read_text(encoding='utf-8')
 ammo_defs=ammo[ammo.index('int nanoGap ='):ammo.index('nanoScope.Place(',ammo.index('int nanoGap ='))]
 death_y=re.search(r'y = \(int\)ceilf\([^;]+;',death).group(0)
 layout_checks=r'''
+    for (int step=0;step<=15;++step) {
+    bottomVar.value=0.75f+step*0.025f;
     // Largest stock values: 100 health/armor and three-digit clip/reserve ammo.
     float armorRight=0;
     {
@@ -109,7 +111,7 @@ layout_checks=r'''
         { struct { TestRect rect; } m_hEmpty[1]={{{24,24}}};
           int m_enArmorType=0,m_iHeight=24;
           int x=xArmor;
-          int dw=20,cw=24;float size=1.125f;
+          int dw=20,cw=24;float size=bottomVar.value;
           NanoHudScope nanoScope("nano_hud_bottom",0,1);
           ARMOR_PLACE
           float ax=x,ay=y,aw=84,ah=25;
@@ -150,6 +152,8 @@ layout_checks=r'''
     SPR_AdjustSize(&x,&y,&w,&h);
     assert(x==2 && y==84 && w==32 && h==32);
     pixelVar.value=0;
+    }
+    bottomVar.value=1.125f;
 '''
 layout_checks=layout_checks.replace('HEALTH_PLACE',placement('health.cpp')).replace('ARMOR_PLACE',placement('battery.cpp'))
 layout_checks=layout_checks.replace('AMMO_DEFS',ammo_defs).replace('AMMO_PLACE',placement('ammo.cpp'))
@@ -238,8 +242,8 @@ int main() {
     assert(x==112 && y==120 && w==5 && h==1);
     pixelVar.value=0;
     NanoCrosshairRect arms[4];
-    for (int size=239; size<=241; ++size) for (int gap=0; gap<18; ++gap) {
-        NanoCrosshairRects(size,size,gap+0.35f,5.4f,arms);
+    for (int size=239; size<=241; ++size) for (int gap=0; gap<18; ++gap) for (int scale=4;scale<=12;++scale) {
+        NanoCrosshairRects(size,size,gap+0.35f,5.4f,arms,scale/8.0f);
         int center=size/2;
         assert(arms[0].w==arms[1].w && arms[2].h==arms[3].h);
         assert(arms[0].x+arms[0].w-1==2*center-arms[1].x);

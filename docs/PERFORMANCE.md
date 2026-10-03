@@ -4,6 +4,8 @@ Measurements on 2026-10-03 used the source-built framebuffer ports at 240×240 a
 
 ## What changed
 
+The source-built [Nano settings](NANO-SETTINGS.md) menu now exposes the FPS-limit toggle, 15–60 FPS slider and frame-sleep toggle. The default remains 30 FPS with sleeping enabled. Each game remembers its choices. Turning off the cap retains its slider value for later use; it does not impose a new performance guarantee. CPU overclock remains 1200 MHz.
+
 The pinned engine bypasses `fps_max` when `gl_vsync` is enabled. The software framebuffer does not supply a VSync wait, so the prior configuration could render continuously. With VSync disabled, the old frame limiter still busy-waited when frame work consumed more than half the available time. The Nano policy sleeps for the remaining time in chunks of at most 5 ms, leaving a 0.2 ms margin before the deadline. It retains the original path when disabled and on dedicated servers.
 
 ## Short hardware runs

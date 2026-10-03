@@ -333,7 +333,7 @@
  	int x, y;
  
  	if( g_iUser1 && g_iUser1 != OBS_IN_EYE )
-@@ -1706,6 +1718,25 @@
+@@ -1706,6 +1718,26 @@
  		flCrosshairDistance = m_flCrosshairDistance;
  	}
  
@@ -344,7 +344,8 @@
 +		int height = (int)floorf(ScreenHeight*hs + 0.5f);
 +		float sx = width/(float)ScreenWidth;
 +		NanoCrosshairRect arms[4];
-+		NanoCrosshairRects(width, height, flCrosshairDistance*sx, iLength*sx, arms);
++		NanoCrosshairRects(width, height, flCrosshairDistance*sx, iLength*sx, arms,
++            gEngfuncs.pfnGetCvarFloat("nano_hud_crosshair")*0.5f);
 +		float oldPixels = gEngfuncs.pfnGetCvarFloat("nano_hud_pixel_coordinates");
 +		gEngfuncs.Cvar_SetValue("nano_hud_pixel_coordinates", 1);
 +		for (int i=0; i<4; ++i) {

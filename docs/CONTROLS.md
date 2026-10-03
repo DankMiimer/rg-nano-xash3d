@@ -1,5 +1,7 @@
 # Controls
 
+Source-built games also offer **Menu → Options → Nano settings** for FPS, aiming and independent HUD sizes. Changes apply immediately and save separately for each game. See [settings ranges and defaults](NANO-SETTINGS.md).
+
 | Button | Both games |
 |---|---|
 | D-pad Up/Down | Walk forward/backward |

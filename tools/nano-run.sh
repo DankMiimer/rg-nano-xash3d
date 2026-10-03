@@ -94,6 +94,7 @@ case "$GAME" in
     cstrike) set -- "$@" +maxplayers 4 +sv_lan 1 +exec nano-offline.cfg +map de_dust;;
 esac
 set -- "$@" +exec nano-controls.cfg
+[ ! -f "$ROOT/$GAME/nano-settings.cfg" ] || set -- "$@" +exec nano-settings.cfg
 [ "$BACKEND" != fbdev ] || [ "${NANO_PROFILE:-0}" != 1 ] || set -- "$@" +nano_profile 1
 "$ROOT/nano-supervise-arm" "$LOGS" "$SOCKET" -- "$@" > "$LOGS/supervisor.log" 2>&1 &
 WATCH_PID=$!

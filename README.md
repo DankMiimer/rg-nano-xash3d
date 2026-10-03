@@ -10,6 +10,7 @@ Open-source launchers, controls, build recipes and source patches for running Ha
 - D-pad walks/turns; hold R for vertical look and strafing; precise camera speed by default, hold L for three times faster look. X shoots; A uses; B jumps; Y reloads.
 - Source-built profile adds horizontal hold acceleration, independently scaled original HUD groups, half-size CS radar, a pixel-symmetric crosshair and larger main/pause/settings menus on the Nano's 240×240 display.
 - Software profiles explicitly disable VSync so the configured 30 FPS cap is respected.
+- Source-built **Options → Nano settings** provides FPS-limit/frame-sleep toggles, an FPS slider, camera speed/acceleration controls and separate HUD size sliders. Choices save per game; see [Nano settings](docs/NANO-SETTINGS.md).
 - Launchers set 1200 MHz and restore 1008 MHz when the game process exits.
 - Half-Life launches the opening campaign directly with the current launcher settings.
 - Counter-Strike launches an offline de_dust match with two easy bots, one-minute rounds and spectator picture-in-picture prevented from being re-enabled by the Use button.
@@ -111,6 +112,7 @@ python3 tests/test_alsa_ring.py
 python3 tests/test_renderer_triangles.py
 python3 tests/test_nano_menu.py
 python3 tests/test_nano_settings.py
+python3 tests/test_nano_options.py
 python3 tests/test_nano_frame_stats.py
 ```
 
@@ -128,6 +130,6 @@ This exercises the actual renderer function with normal, fully off-screen, zero-
 
 ## License and credits
 
-Support tools are GPL-3.0-or-later; the small aiming/HUD helpers in `src/nano-*.h` are MIT, as marked in each file. Existing upstream code, patches and components retain their applicable licenses and notices; see [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [SOURCES.md](SOURCES.md). The GPL grant for this repository does not license Valve game data, extracted artwork, third-party fonts, or binaries with unestablished corresponding source.
+Support tools and the menu integration in `src/nano-menu-options.h` are GPL-3.0-or-later; the small aiming/HUD, frame statistics and numeric settings helpers are MIT, as marked in each file. Existing upstream code, patches and components retain their applicable licenses and notices; see [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [SOURCES.md](SOURCES.md). The GPL grant for this repository does not license Valve game data, extracted artwork, third-party fonts, or binaries with unestablished corresponding source.
 
 Credits: Sn3zee-cmds/XASH3DFS; FWGS/Xash3D and its contributors; Velaron/CS16Client and its contributors; ReGameDLL_CS; FunKey-Project and firmware maintainers; and DankMiimer/NanoCraft for the clock helper. This is an independent project, unaffiliated with Valve or Anbernic.

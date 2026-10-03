@@ -65,7 +65,7 @@
  
  CMenuFramework::CMenuFramework( const char *name ) : BaseClass( name )
  {
-+	nanoSettings = !strcmp(name,"CMenuOptions") || !strcmp(name,"CMenuAudio") ||
++	nanoSettings = !strcmp(name,"CMenuNanoOptions") || !strcmp(name,"CMenuOptions") || !strcmp(name,"CMenuAudio") ||
 +        !strcmp(name,"CMenuVideo") || !strcmp(name,"CMenuVidOptions") ||
 +        !strcmp(name,"CMenuVidModes") || !strcmp(name,"CMenuControls") ||
 +        !strcmp(name,"CAdvancedControls") || !strcmp(name,"CMenuGameOptions") ||
@@ -279,6 +279,20 @@
  	typedef CMenuEditable BaseClass;
  
  	CMenuSlider();
+--- a/controls/Slider.cpp
++++ b/controls/Slider.cpp
+@@ -45,8 +45,9 @@
+ */
+ void CMenuSlider::VidInit(  )
+ {
+-	if( m_flRange < 0.05f )
+-		m_flRange = 0.05f;
++	const float minimumStep = ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile") ? 0.005f : 0.05f;
++    if( m_flRange < minimumStep )
++        m_flRange = minimumStep;
+ 
+ 	colorBase.SetDefault( uiColorWhite );
+ 	colorFocus.SetDefault( uiColorWhite );
 --- a/controls/SpinControl.h
 +++ b/controls/SpinControl.h
 @@ -23,6 +23,8 @@
@@ -416,3 +430,22 @@
  	CMenuFramework::Think();
  }
  
+--- a/menus/Configuration.cpp
++++ b/menus/Configuration.cpp
+@@ -24,6 +24,7 @@
+ #include "YesNoMessageBox.h"
+ #include "keydefs.h"
+ #include "TabView.h"
++#include "nano-menu-options.h"
+ 
+ #define ART_BANNER	     	"gfx/shell/head_config"
+ 
+@@ -61,6 +62,8 @@
+ 		PC_AUDIO, UI_Audio_Menu, QMF_NOTIFY );
+ 	AddButton( L( "GameUI_Video" ), L( "Change screen size, video mode, gamme and glare reduction." ),
+ 		PC_VIDEO, UI_Video_Menu, QMF_NOTIFY );
++    if (ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile"))
++        AddButton("Nano settings",nullptr,PC_CONFIG,UI_NanoOptions_Menu);
+ 	AddButton( L( "Done" ), L( "Go back to the Main Menu." ),
+ 		PC_DONE, VoidCb( &CMenuOptions::Hide ), QMF_NOTIFY );
+ }

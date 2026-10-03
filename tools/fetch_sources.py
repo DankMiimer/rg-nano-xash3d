@@ -44,6 +44,8 @@ if __name__ == '__main__':
     apply(client, 'cs16-nano-4141.patch')
     apply(client, 'cs16-nano-spectator.patch')
     apply(client/"3rdparty/mainui_cpp", "cs16-mainui-nano-menu.patch")
+    for header in ("nano-menu-options.h", "nano-settings.h"):
+        shutil.copy2(ROOT/"src"/header,client/"3rdparty/mainui_cpp/menus"/header)
 
     for patch in ("cs16-nano-look.patch", "cs16-nano-hud.patch"): apply(client,patch)
     for header in ("nano-look.h", "nano-hud-scope.h", "nano-crosshair.h"): shutil.copy2(ROOT/"src"/header,client/"cl_dll"/header)

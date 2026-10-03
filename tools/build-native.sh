@@ -18,7 +18,7 @@ export CFLAGS='-O2 -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard'
 export CXXFLAGS="$CFLAGS"
 export CCACHE_DIR="$TASK_NATIVE/ccache"
 cd "$TASK_NATIVE/xash3d"
-python3 waf configure --enable-fbdev --disable-gl --low-memory-mode=1 --disable-werror -T release --prefix=/ --out="$TASK_NATIVE/engine-build"
+python3 waf configure --enable-fbdev --disable-gl --low-memory-mode=1 --enable-stbtt --disable-werror -T release --prefix=/ --out="$TASK_NATIVE/engine-build"
 python3 waf build -j"${JOBS:-4}"
 python3 waf install --destdir="$TASK_NATIVE/engine-install"
 cmake -S "$TASK_NATIVE/hlsdk" -B "$TASK_NATIVE/hl-build" -G Ninja \
