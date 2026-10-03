@@ -2,18 +2,18 @@
 
 Open-source launchers, controls, build recipes and source patches for running Half-Life and Counter-Strike on an RG Nano with FunKeyOS/DrUm78 firmware.
 
-**This repository is a support project, not a complete open-source distribution of the installed games or the original Nano engine port.** It contains no commercial game data, extracted game icons, fonts, navigation files or prebuilt runtime libraries. Supply your own game installation and the separately obtained XASH3DFS base package. See [SOURCES.md](SOURCES.md) for exact provenance and the remaining source-availability gap.
+**This repository is a support project, not a complete open-source distribution of the installed games or the original Nano engine port.** It contains no commercial game data, extracted game icons, fonts, navigation files or prebuilt runtime libraries. Supply your own game installation. The established SDL runtime uses the separately obtained XASH3DFS base package; an experimental framebuffer runtime builds the engine and Half-Life libraries from pinned upstream source without that package. See [SOURCES.md](SOURCES.md) for exact provenance and the remaining source-availability gap.
 
 ## Current behavior
 
 - Separate Half-Life and Counter-Strike entries in Native games, with icons extracted locally from each game's `game.ico`.
-- D-pad walks/turns; L/R strafe; Y shoots; A uses; B jumps; X reloads.
+- D-pad walks/turns; L/R strafe; X shoots; A uses; B jumps; Y reloads.
 - HUD scale 0.65 for the Nano's 240×240 display.
 - Launchers set 1200 MHz and restore 1008 MHz when the game process exits.
 - Half-Life launches the opening campaign directly with the current launcher settings.
-- Counter-Strike launches an offline de_dust match with two easy bots, one-minute rounds and spectator picture-in-picture disabled.
+- Counter-Strike launches an offline de_dust match with two easy bots, one-minute rounds and spectator picture-in-picture prevented from being re-enabled by the Use button.
 - Private Nano SDL library uses ALSA's `default` device; firmware libraries are not overwritten.
-- The user confirmed menu navigation and sound work correctly on the device.
+- The user confirmed menu navigation and sound on the established ports, and movement, shooting and sound on source-built Counter-Strike.
 - Software renderer permits 4096 textures and clips off-screen HUD graphics before accessing the framebuffer.
 
 See [CONTROLS.md](docs/CONTROLS.md) and [VALIDATION.md](docs/VALIDATION.md). These remain experimental ports: HUD graphics have rendering defects, and extended campaign/multiplayer stability has not been established.
@@ -28,9 +28,31 @@ export FUNKEY_SDK=/absolute/path/to/FunKey-sdk-2.3.0
 bash tools/build.sh
 ```
 
-The script fetches commits pinned in [sources.lock.json](sources.lock.json), applies the patches, then builds the ARM hard-float CS client/server, software renderer and two launch helpers. It does **not** rebuild the original Nano engine or Half-Life client/server: those still come from the external base OPK.
+The script fetches commits pinned in [sources.lock.json](sources.lock.json), applies the patches, then builds the ARM hard-float CS client/server, software renderer and three launch helpers. It does **not** rebuild the original Nano engine or Half-Life client/server: those still come from the external base OPK.
 
 The Counter-Strike patch admits the base port's legacy build marker 4141 while retaining render-interface version checks. This is an experimental compatibility adjustment, not proof of full API compatibility.
+
+## Experimental source-built runtime
+
+The native recipe builds the Xash3D engine, filesystem, software renderer, menu and ARM Half-Life client/server from source. It uses Linux framebuffer, evdev and ALSA directly. It does not consume the original XASH3DFS OPK, its Half-Life libraries, or the Nano SDL library. The same source-built CS components are used for Counter-Strike. Build the regular components above first, then:
+
+```sh
+# Optional: choose a persistent Linux build directory for faster WSL builds.
+export NANO_NATIVE_DIR=/absolute/path/to/native-build
+bash tools/build-native.sh
+python3 tools/prepare_native.py \
+  --games /absolute/path/to/your/Half-Life \
+  --native-build "$NANO_NATIVE_DIR" \
+  --sdk "$FUNKEY_SDK" \
+  --font /absolute/path/to/FiraSans-Regular.ttf \
+  --nav /absolute/path/to/your/de_dust.nav
+```
+
+The source-built engine now renders and accepts controls in both games; Half-Life audio and Counter-Strike movement, firing and audio have been confirmed on hardware. Extended stability remains unverified.
+
+Assembly resolves shared-library dependencies from the SDK and records their hashes. FunKeyOS supplies musl libc and its established ALSA output stack; Valve assets, fonts and optional navigation remain user-supplied. The default output is `build/native-runtime`, intended for `/mnt/FunKey/Xash3D-source`. This is a separate test installation. `python3 tools/install.py --native` adds entries labelled `(source)`; normal `install.py` updates the established legacy runtime. Do not switch normal game entries until hardware display, controls, sound and gameplay have passed comparison checks.
+
+Half-Life SDK code is source-available under Valve's SDK license, which permits free distribution and requires notices; it is not covered by this project's GPL. See `licenses/hlsdk-portable.txt`. Building from public source removes the unknown base-binary dependency, but does not make the commercial games or every component uniformly open source.
 
 ## Assemble a private installation
 
@@ -71,6 +93,20 @@ python3 tools/install.py
 ```
 
 An existing save directory is retained. Runtime files, controls and launcher entries are updated. Refresh Native games or restart the frontend to reload cached icons. To use a different tested clock, edit `/mnt/FunKey/Xash3D/cpu-mhz`; the launcher reads it at every start. The default is 1200 MHz.
+
+## Recovery and diagnostics
+
+At startup, the launcher reapplies saved system volume and enables the speaker amplifier, respecting volume zero. It runs the game under `nano-supervise-arm`. Hold **Fn + Start + Menu** to request shutdown. The supervisor resumes a stopped child, sends TERM to its own process group, and escalates to KILL after five seconds if needed. The launcher then restores the stock clock and default keys. This covers ordinary crashes and userspace hangs; it does not guarantee recovery from a kernel or device-driver lockup.
+
+Diagnostics are under `diagnostics/valve` or `diagnostics/cstrike` inside the runtime. `engine.log` captures output, `metrics.csv` samples RAM/swap/page faults/CPU counters every two seconds, and `result.txt` records exit status, termination signals and crash signals printed by Xash's own handler (which can otherwise exit with code zero). Engine and metric logs keep two files of at most 512 KiB each. There is no automatic freeze detector; recovery is user-triggered.
+
+```sh
+gcc -O2 -Wall -Wextra -Werror src/nano-supervise.c -o /var/tmp/rg-nano-supervise-host
+python3 tests/test_supervisor.py
+# After build-native.sh (uses NANO_NATIVE_DIR if set):
+python3 tests/test_alsa_ring.py
+python3 tests/test_renderer_triangles.py
+```
 
 ## Check renderer clipping
 

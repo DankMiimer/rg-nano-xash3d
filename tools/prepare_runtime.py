@@ -71,8 +71,10 @@ def main():
     for rel in ('cl_dlls/client_armv7hf.so', 'cl_dlls/menu_armv7hf.so', 'dlls/cs_armv7hf.so', 'extras.pk3'):
         copy(cs/rel, runtime/'cstrike'/rel)
     copy(ROOT/'build/renderer/libref_soft.so', runtime/'engine/ref/libref_soft.so')
-    for helper in ('nano-clk-arm', 'seed-rng-arm'):
+    for helper in ('nano-clk-arm', 'seed-rng-arm', 'nano-supervise-arm'):
         copy(ROOT/'build/bin'/helper, runtime/helper)
+    copy(ROOT/'tools/nano-run.sh', runtime/'nano-run.sh')
+    (runtime/'backend').write_text('legacy\n')
     for name in ('tahoma.ttf', 'FiraSans-Regular.ttf'):
         copy(args.font, runtime/'valve/gfx/fonts'/name)
     if args.nav:

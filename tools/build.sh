@@ -24,4 +24,5 @@ cmake -S "$TASK_ROOT/renderer" -B "$TASK_ROOT/build/renderer" -G Ninja \
 cmake --build "$TASK_ROOT/build/renderer" --parallel "${JOBS:-4}"
 "$TASK_CC" -O2 -static "$TASK_ROOT/src/nano-clk.c" -o "$TASK_ROOT/build/bin/nano-clk-arm"
 "$TASK_CC" -O2 -static "$TASK_ROOT/src/seed-rng.c" -o "$TASK_ROOT/build/bin/seed-rng-arm"
+"$TASK_CC" -O2 -static -Wall -Wextra -Werror "$TASK_ROOT/src/nano-supervise.c" -o "$TASK_ROOT/build/bin/nano-supervise-arm"
 echo 'Built CS client/server, software renderer and launch helpers.'

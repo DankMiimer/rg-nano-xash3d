@@ -1,18 +1,33 @@
 # Validation and remaining limitations
 
-Device checks were performed on an RG Nano with approximately 54 MiB of available system RAM, SD-backed swap and FunKeyOS 2.3.0.
+Checks were performed on an RG Nano with 56,164 KiB total RAM, SD-backed swap and FunKeyOS 2.3.0/DrUm78 firmware. Both launch paths use 1200 MHz while playing and restore 1008 MHz on exit.
 
-- The published build recipe passed from fresh pinned source checkouts using FunKey SDK 2.3.0, producing ARM CS client/server/menu libraries, the software renderer and static launch helpers.
-- Private runtime assembly passed using local Steam assets, the pinned base OPK and the Nano's SDL. The engine/SDL byte patches matched the working installation inputs, and regenerated icons had identical pixels. The fresh assembly was not installed over the existing device runtime.
-- Game icons were extracted from each local `game.ico`, packaged into the individual launchers, and verified against the installed Nano PNGs by SHA-256.
-- Both launcher paths set the CPU to 1200 MHz; hardware register readback confirmed the applied clock. Normal game-process exit restored 1008 MHz.
-- Half-Life rendered the opening campaign and created a quick-save. Full campaign completion has not been tested.
-- Counter-Strike entered an offline de_dust match with two bots. The user confirmed Y fires after changing it to a regular key.
-- After the renderer clipping correction, a subsequent enemy headshot was followed by respawn and several more minutes of responsive gameplay without a captured crash signal. Earlier runs had an exit and a reported freeze after death; this short successful test does not establish long-term stability.
-- Renderer clipping tests exercise the actual patched drawing function with normal, fully off-screen, zero-size and edge-clipped rectangles, framebuffer guard checks, texture sampling checks, AddressSanitizer and UndefinedBehaviorSanitizer.
-- The HUD scale increased from 0.375 to 0.65. Graphical defects remain in some HUD sprites.
-- The user subsequently confirmed menu navigation and sound work correctly. The Half-Life launcher currently starts the campaign directly.
-- Initial loads can be slow. The system uses considerable swap, so performance and responsiveness depend on the SD card and scene.
-- The original Nano base engine and Half-Life client/server cannot yet be reproduced entirely from established corresponding source. The public build reproduces the separately built CS client/server, renderer, helpers and launchers.
+## Established SDL ports
 
-Runtime and clock logs are stored under `/mnt/FunKey/Xash3D`. The supplied offline settings disable the spectator inset and shorten rounds; these settings do not prove the earlier freeze's exact cause.
+- The pinned build recipe produced ARM CS client/server/menu libraries, the software renderer and static helpers using FunKey SDK 2.3.0. Private assembly with user-supplied Steam assets, the external base OPK and the Nano’s SDL passed; no assets or runtime binaries are published.
+- Game icons were extracted from the local `game.ico` files, packaged into launchers and checked against the installed PNG hashes.
+- Half-Life rendered the opening campaign and created a quick-save. The user confirmed both games’ menu navigation and sound, and Y shooting in Counter-Strike.
+- A CS headshot was followed by respawn and several more minutes of responsive play after the renderer clipping correction. Earlier runs exited or froze after death. These short runs do not establish the exact earlier cause or long-term stability.
+- The central Half-Life launcher was exercised on hardware. Its stopped child was recovered through the supervisor, and clock readback confirmed restoration to 1008 MHz.
+
+## Independent source-built ports
+
+- The complete native recipe builds the FWGS engine, filesystem, menu, software renderer and portable Half-Life client/server from pinned source. Private assembly resolves SDK dependencies and uses firmware libc/ALSA. It does not open or copy from an XASH3DFS OPK or use its SDL or Half-Life libraries.
+- Compilation and a fresh private assembly passed. The installation is isolated under `/mnt/FunKey/Xash3D-source`, with Native games entries labelled `(source)`. Ordinary entries still use the established SDL runtime.
+- Framebuffer output renders at 240×240. Pitch and framebuffer allocation checks passed against the Nano’s 16-bit display. Double buffering has not been implemented or measured.
+- Native evdev input uses the kernel’s 16-byte input records. A hardware ABI probe found that SDK `struct input_event` is 24 bytes because of its time64 layout. Correcting this restored user-confirmed controls. The firmware key-name index compensation remains necessary.
+- Half-Life renders the opening tram and responds to controls. The user confirmed game audio after changing system volume. The launcher now reapplies saved volume and powers the amplifier before starting a game; direct ADB tests had bypassed the frontend’s audio setup.
+- The user confirmed movement, Y shooting and sound in source-built Counter-Strike without first changing volume. Pressing A while spectating subsequently froze the display; the user stopped/restarted the device. The log captured a requested shutdown with no engine crash signal and restored the clock. A enables the inset camera in the upstream client. A published `spec_pip_allow` policy now blocks all second-view activation in the Nano profile; The user confirmed that A after death stays responsive and the next-round respawn works after this change. X fire/Y reload were installed at the user’s request.
+- ALSA streaming handles partial writes and a full nonblocking queue without resetting it. Mixer time follows consumed frames, including whole-ring advances between slow updates. Repeated active notifications no longer discard the queue. Hardware PCM counters advance continuously during gameplay; loading can still underrun.
+- Engine and Half-Life revisions are aligned to precede the newer FreeVGUI `SetPaintOffset` interface. An initially mismatched client compiled but crashed; neither compilation alone nor an engine version marker establishes API compatibility.
+
+## Automated and recovery checks
+
+- Triangle geometry tests extract the actual dispatcher and rasterizer winding gate and cover front/back faces, two-sided map tiles, mirrored weapons, quad fans, strip winding and fully clipped geometry under AddressSanitizer/UndefinedBehaviorSanitizer. The user subsequently confirmed complete first-person spectator weapons and a visible bird’s-eye map after the correction. The temporary death-test binding was removed.
+- Renderer tests exercise the actual patched drawing function with normal, fully off-screen, zero-size and edge-clipped rectangles, guard checks and texture sampling under AddressSanitizer/UndefinedBehaviorSanitizer.
+- ALSA tests extract the actual backend functions and check full queues, underruns, partial writes, wrap boundaries, paused output, bounded draining, mixed-data limits, absolute playback time, whole-ring consumption, restart, long-run counter rebasing and activation transitions under AddressSanitizer/UndefinedBehaviorSanitizer.
+- Ten supervisor integration tests cover exit status, process crashes, engine-handled crash reports, stopped-child recovery, forced termination, unrelated-process ownership, socket ownership, stale-result cleanup, bounded logs and bounded FIFO writes. Host builds use `-Wall -Wextra -Werror`; ARM smoke checks also passed.
+- Logs capture stdout/stderr and RAM/swap/page-fault/CPU samples. Each engine/metric log retains two files of at most 512 KiB. Xash can handle a crash and exit zero, so `result.txt` also records crash signals printed by its handler.
+- Recovery resumes the owned game group, sends TERM and escalates to KILL after five seconds. Launcher cleanup restores the clock and default keys. This covers userspace hangs; it does not guarantee recovery from a kernel/driver lockup. There is no automatic freeze detector.
+
+HUD scale is 0.65, but some sprites still render incorrectly. Initial loads and some scenes use substantial swap. Full campaign completion, extended multiplayer play, repeated suspend/resume and long sessions remain unverified. See [ROADMAP.md](ROADMAP.md) for the next improvements.

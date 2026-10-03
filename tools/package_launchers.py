@@ -1,10 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from pathlib import Path
-import shutil, tarfile, re
+import argparse, shutil, tarfile, re
+parser=argparse.ArgumentParser()
+parser.add_argument("--native",action="store_true")
+parser.add_argument("--runtime-root")
+args=parser.parse_args()
+runtime_root=args.runtime_root or ("/mnt/FunKey/Xash3D-source" if args.native else "/mnt/FunKey/Xash3D")
+if not re.fullmatch(r"/mnt/FunKey/[A-Za-z0-9_-]+",runtime_root): parser.error("Invalid runtime directory")
 base=Path(__file__).resolve().parents[1]/'build'
-out=base/'dist'
+out=base/('native-dist' if args.native else 'dist')
 out.mkdir(exist_ok=True)
-stage=base/'launcher-stage'
+stage=base/('native-launcher-stage' if args.native else 'launcher-stage')
 common='''// RG Nano controls and modest memory settings.
 unbindall
 bind "ESCAPE" "cancelselect"
@@ -40,30 +46,13 @@ data=base/'config-stage'
 for game,title,server,extra in [
  ('valve','Half-Life','hl',' +map c0a0'),
  ('cstrike','Counter-Strike','cs',' +maxplayers 4 +sv_lan 1 +exec nano-offline.cfg +map de_dust')]:
+    if args.native: title += " (source)"
     target=stage/game
     target.mkdir(parents=True,exist_ok=True)
     (target/'xash3d.png').unlink(missing_ok=True)
     launcher=f'''#!/bin/sh
-ROOT=/mnt/FunKey/Xash3D
-cd "$ROOT" || exit 1
-ln -sf /dev/urandom /tmp/xash-r
-sleep 0.3
-echo "LOAD $ROOT/nano.key" > /tmp/fkgpiod.fifo
-sleep 0.3
-CPU_MHZ=$(cat "$ROOT/cpu-mhz" 2>/dev/null)
-CPU_MHZ=${{CPU_MHZ:-1200}}
-"$ROOT/nano-clk-arm" --set "$CPU_MHZ" > "$ROOT/{game}-clock.log" 2>&1
-trap '"$ROOT/nano-clk-arm" --restore >> "$ROOT/{game}-clock.log" 2>&1' EXIT
-if [ ! -f /run/xash-rng-seeded ] && [ -f "$ROOT/rng-seed" ]; then
-    "$ROOT/seed-rng-arm" "$ROOT/rng-seed"
-    dd if=/dev/urandom of="$ROOT/rng-seed.new" bs=256 count=1 2>/dev/null
-    mv "$ROOT/rng-seed.new" "$ROOT/rng-seed"
-    touch /run/xash-rng-seeded
-fi
-export LD_LIBRARY_PATH="$ROOT:$ROOT/engine:$ROOT/engine/ref"
-export SDL_VIDEODRIVER=fbcon SDL_FBDEV=/dev/fb0 SDL_NOMOUSE=1 SDL_AUDIODRIVER=alsa AUDIODEV=default
-"$ROOT/engine/xash3d" -game {game} -ref soft -clientlib {game}/cl_dlls/client_armv7hf.so -dll {game}/dlls/{server}_armv7hf.so -width 240 -height 240 -log{extra} +exec nano-controls.cfg > "$ROOT/{game}-runtime.log" 2>&1
-exit $?
+ROOT={runtime_root}
+exec "$ROOT/nano-run.sh" "$ROOT" {game}
 '''
     (target/'launch.sh').write_text(launcher,newline='\n')
     (target/f'{game}.funkey-s.desktop').write_text(f'[Desktop Entry]\nName={title}\nComment={title} for RG Nano\nExec=launch.sh\nIcon={game}\nCategories=games\n',newline='\n')
@@ -74,7 +63,7 @@ exit $?
     binds='bind "1" "+lookup"\nbind "3" "+lookdown"\nbind "2" "+attack2"\nbind "4" "savequick"\nbind "5" "loadquick"\nbind "p" "impulse 100"\nbind "f" "invnext"\n'
     if game=='cstrike':
         binds=''.join(f'bind "{i}" "slot{i}"\n' for i in range(1,6))
-        binds+='cl_oldtouchmenus "0"\n_vgui_menus "0"\nhud_fastswitch "1"\nspec_pip_internal "0"\ncl_corpsestay "5"\ncl_shadows "0"\nbind "p" "buy"\nbind "f" "autobuy"\n'
+        binds+='cl_oldtouchmenus "0"\n_vgui_menus "0"\nhud_fastswitch "1"\nspec_pip_allow "0"\nspec_pip_internal "0"\ncl_corpsestay "5"\ncl_shadows "0"\nbind "p" "buy"\nbind "f" "autobuy"\n'
     controls=re.sub(r'bind "([A-Z])"([^\n]*)',lambda m: 'bind "'+m[1].lower()+'"'+m[2]+'\nbind "'+m[1]+'"'+m[2],common+binds)
     (cfgdir/'nano-controls.cfg').write_text(controls,newline='\n')
     (cfgdir/'userconfig.cfg').write_text('exec nano-controls.cfg\n',newline='\n')
@@ -95,8 +84,8 @@ MAP R        TO KEY     KEY_G
 MAP L        TO KEY     KEY_T
 MAP A        TO KEY     KEY_ENTER
 MAP B        TO KEY     KEY_SPACE
-MAP X        TO KEY     KEY_E
-MAP Y        TO KEY     KEY_V
+MAP X        TO KEY     KEY_V
+MAP Y        TO KEY     KEY_E
 MAP MENU     TO KEY     KEY_ESC
 MAP FN+START TO KEY     KEY_F
 MAP FN+MENU  TO KEY     KEY_Z
@@ -108,7 +97,9 @@ MAP FN+B     TO COMMAND brightness down
 MAP FN+L     TO KEY     KEY_4
 MAP FN+R     TO KEY     KEY_5
 MAP FN+L+R   TO COMMAND system_stats toggle
+MAP FN+START+MENU TO COMMAND /mnt/FunKey/Xash3D/nano-supervise-arm --stop /run/xash-nano.sock
 '''
+keymap=keymap.replace('/mnt/FunKey/Xash3D/',runtime_root+'/')
 (data/'nano.key').write_text(keymap,newline='\n')
 with tarfile.open(base/'configs.tar','w') as archive:
     archive.add(data/'valve',arcname='valve')

@@ -1,0 +1,238 @@
+diff --git a/engine/client/sound/s_main.c b/engine/client/sound/s_main.c
+index 05f227a..10b6add 100644
+--- a/engine/client/sound/s_main.c
++++ b/engine/client/sound/s_main.c
+@@ -1504,6 +1504,10 @@ update global soundtime
+ */
+ static int S_GetSoundtime( void )
+ {
++#if XASH_SOUND == SOUND_ALSA
++	// ALSA publishes consumed frames, including whole-ring advances.
++	return snd.soundtime;
++#else
+ 	static int buffers, oldsamplepos;
+ 
+ 	int fullsamples = snd.samples / 2;
+@@ -1529,6 +1533,7 @@ static int S_GetSoundtime( void )
+ 	oldsamplepos = samplepos;
+ 
+ 	return ( buffers * fullsamples + samplepos / 2 );
++#endif
+ }
+ 
+ //=============================================================================
+diff --git a/engine/platform/linux/s_alsa.c b/engine/platform/linux/s_alsa.c
+index 3c405db..3124790 100644
+--- a/engine/platform/linux/s_alsa.c
++++ b/engine/platform/linux/s_alsa.c
+@@ -16,6 +16,7 @@ GNU General Public License for more details.
+ #include "platform/platform.h"
+ #if XASH_SOUND == SOUND_ALSA
+ #include <alsa/asoundlib.h>
++#include <errno.h>
+ #include "sound.h"
+ 
+ #define PERIOD_SIZE_DEFAULT 2048
+@@ -30,22 +31,12 @@ static struct s_alsa_t
+ 	int period_size;
+ 	qboolean period_npot;
+ 	qboolean paused;
++	unsigned long long frames_written;
+ } s_alsa;
+ 
+ void SND_Pause_f( void )
+ {
+-	s_alsa.paused = Q_atoi( Cmd_Argv( 1 ) ) ;
+-
+-	if( !s_alsa.paused )
+-	{
+-		snd_pcm_start( s_alsa.pcm_handle );
+-		snd_pcm_prepare( s_alsa.pcm_handle );
+-	}
+-	else
+-	{
+-		snd_pcm_drain( s_alsa.pcm_handle );
+-		snd_pcm_drop( s_alsa.pcm_handle );
+-	}
++	SNDDMA_Activate( !Q_atoi( Cmd_Argv( 1 ) ) );
+ }
+ 
+ 
+@@ -171,7 +162,7 @@ qboolean SNDDMA_Init( void )
+ 	}
+ 	s_alsa.period_size = p;
+ 
+-	p = samples;
++	p = samples / 2; // ALSA counts stereo frames, snd.samples counts individual samples.
+ 	snd_pcm_hw_params_set_buffer_size_near( s_alsa.pcm_handle, s_alsa.hw_params, &p );
+ 	Con_Printf( "ALSA: buffer size %lu\n", p );
+ 
+@@ -191,9 +182,10 @@ qboolean SNDDMA_Init( void )
+ 	snd.initialized = 1;
+ 	snd.backend_name = "ALSA";
+ 
++	s_alsa.frames_written = 0;
++	s_alsa.paused = false;
+ 	snd_pcm_prepare( s_alsa.pcm_handle );
+-	snd_pcm_writei( s_alsa.pcm_handle, snd.buffer, 2 * s_alsa.period_size );
+-	snd_pcm_start( s_alsa.pcm_handle );
++	// Start only when mixed audio is submitted; do not queue unpainted silence.
+ 
+ 	return true;
+ }
+@@ -228,76 +220,41 @@ Send sound to device if buffer isn't really the dma buffer
+ */
+ void SNDDMA_Submit( void )
+ {
+-	if( s_alsa.paused )
++	if( s_alsa.paused || !snd.buffer )
+ 		return;
+ 
+-	if( s_alsa.period_npot )
++	// A nonblocking PCM can accept a partial period, or return EAGAIN when full.
++	// Advance the ring only by the frames actually accepted. Never reset a full
++	// device as though it had underrun, or spin waiting for hardware space.
++	for( int attempt = 0; attempt < 8; attempt++ )
+ 	{
+-		int avail = snd_pcm_avail_update( s_alsa.pcm_handle );
+-
+-		if( avail < 0 )
+-			snd_pcm_prepare( s_alsa.pcm_handle );
+-
+-		while( avail >= s_alsa.period_size )
++		snd_pcm_sframes_t avail = snd_pcm_avail_update( s_alsa.pcm_handle );
++		if( avail <= 0 )
+ 		{
+-			int size    = snd.samples << 1;
+-			int pos     = snd.samplepos << 1;
+-			unsigned long  len = s_alsa.period_size * 4;
+-			int wrapped = pos + len - size;
+-			int  w;
+-
+-			if( wrapped < 0 )
+-			{
+-				w = snd_pcm_writei( s_alsa.pcm_handle, snd.buffer + pos, len / 4 );
+-				if( w < 0 )
+-				{
+-					snd_pcm_prepare(s_alsa.pcm_handle);
+-					return;
+-				}
+-				snd.samplepos += len >> 1;
+-			}
+-			else
+-			{
+-				int remaining = size - pos;
+-				w = snd_pcm_writei( s_alsa.pcm_handle, snd.buffer + pos, remaining / 4 );
+-				if( w < 0 )
+-				{
+-					snd_pcm_prepare(s_alsa.pcm_handle);
+-					return;
+-				}
+-				w = snd_pcm_writei( s_alsa.pcm_handle, snd.buffer, wrapped / 4 );
+-				if( w < 0 )
+-				{
+-					snd_pcm_prepare(s_alsa.pcm_handle);
+-					return;
+-				}
+-				snd.samplepos = wrapped >> 1;
+-			}
+-
+-			avail = snd_pcm_avail_update( s_alsa.pcm_handle );
+-		}
+-	}
+-	else // period is 1/2 of samples
+-	{
+-		if( !snd.buffer )
++			if( avail == -EPIPE || avail == -ESTRPIPE )
++				snd_pcm_prepare( s_alsa.pcm_handle );
+ 			return;
++		}
+ 
+-		int s = snd.samplepos * 2;
+-		void *start = (void *)&snd.buffer[s];
+-		int frames = s_alsa.period_size / 2;
+-		// write to card
+-		int w = snd_pcm_writei( s_alsa.pcm_handle, start, frames );
+-		if( w < 0 )
++		long long mixed = (long long)snd.paintedtime - (long long)s_alsa.frames_written;
++		if( mixed <= 0 ) return;
++		int writepos = (s_alsa.frames_written % (snd.samples / 2)) * 2;
++		int remaining = (snd.samples - writepos) / 2;
++		int frames = s_alsa.period_size;
++		if( frames > mixed ) frames = mixed;
++		if( frames > avail ) frames = avail;
++		if( frames > remaining ) frames = remaining;
++		const void *start = snd.buffer + writepos * 2;
++		snd_pcm_sframes_t written = snd_pcm_writei( s_alsa.pcm_handle, start, frames );
++		if( written <= 0 )
+ 		{
+-			// xrun occured
+-			snd_pcm_prepare( s_alsa.pcm_handle );
++			if( written == -EPIPE || written == -ESTRPIPE )
++				snd_pcm_prepare( s_alsa.pcm_handle );
+ 			return;
+ 		}
+-
+-		snd.samplepos += w * 2;  // mark progress
+-
+-		if(snd.samplepos >= snd.samples)
+-		  snd.samplepos = 0;  // wrap buffer
++		s_alsa.frames_written += written;
++		if( snd_pcm_state( s_alsa.pcm_handle ) == SND_PCM_STATE_PREPARED )
++			snd_pcm_start( s_alsa.pcm_handle );
+ 	}
+ }
+ 
+@@ -310,6 +267,28 @@ Callback provided by the engine in case we need it.  We don't.
+ */
+ void SNDDMA_BeginPainting(void)
+ {
++	if( !snd.initialized || s_alsa.paused || !snd.samples ) return;
++	snd_pcm_sframes_t delay = 0;
++	int err = snd_pcm_delay( s_alsa.pcm_handle, &delay );
++	if( err < 0 && err != -EPIPE && err != -ESTRPIPE ) return;
++	if( err < 0 || delay < 0 ) delay = 0;
++	unsigned long long pending = (unsigned long long)delay;
++	unsigned long long played = s_alsa.frames_written > pending ? s_alsa.frames_written - pending : 0;
++	qboolean rebased = false;
++	// Use an absolute mixer clock: a slow frame can consume an entire ring.
++	// Modulo-only wrap detection would then stall the mixer permanently.
++	if( snd.paintedtime > 0x40000000 )
++	{
++		unsigned long long ring = snd.samples / 2;
++		unsigned long long offset = played > ring ? (played / ring - 1) * ring : 0;
++		s_alsa.frames_written -= offset;
++		snd.paintedtime -= offset;
++		played -= offset;
++		rebased = offset != 0;
++	}
++	snd.soundtime = played;
++	snd.samplepos = (played % (snd.samples / 2)) * 2;
++	if( rebased ) S_StopAllSounds( true );
+ }
+ 
+ /*
+@@ -322,21 +301,12 @@ between a deactivate and an activate.
+ */
+ void SNDDMA_Activate( qboolean active )
+ {
+-	if( !snd.initialized )
+-		return;
+-
++	if( !snd.initialized || s_alsa.paused == !active ) return;
+ 	s_alsa.paused = !active;
+-
+-	if( !s_alsa.paused )
+-	{
+-		snd_pcm_start( s_alsa.pcm_handle );
++	if( active )
+ 		snd_pcm_prepare( s_alsa.pcm_handle );
+-	}
+ 	else
+-	{
+-		snd_pcm_drain( s_alsa.pcm_handle );
+ 		snd_pcm_drop( s_alsa.pcm_handle );
+-	}
+ }
+ 
+ qboolean VoiceCapture_Init( void )

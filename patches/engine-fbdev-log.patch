@@ -1,0 +1,13 @@
+diff --git a/engine/common/sys_con.c b/engine/common/sys_con.c
+index 3168350..10e471e 100644
+--- a/engine/common/sys_con.c
++++ b/engine/common/sys_con.c
+@@ -284,7 +284,7 @@ static void Sys_PrintStdout( const char *logtime, size_t logtime_len, const char
+ 	}
+ #endif
+ 
+-#if !XASH_MOBILE_PLATFORM && !XASH_WIN32 // Wcon does the job
++#if (!XASH_MOBILE_PLATFORM || XASH_VIDEO == VIDEO_FBDEV) && !XASH_WIN32 // Wcon does the job
+ 	Sys_PrintLogfile( STDOUT_FILENO, logtime, logtime_len, XASH_COLORIZE_CONSOLE ? msg : stripped, XASH_COLORIZE_CONSOLE );
+ 	Sys_FlushStdout();
+ #endif

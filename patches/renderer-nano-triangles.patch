@@ -1,0 +1,74 @@
+diff --git a/ref/soft/r_triapi.c b/ref/soft/r_triapi.c
+index 198f19b..7db7351 100644
+--- a/ref/soft/r_triapi.c
++++ b/ref/soft/r_triapi.c
+@@ -19,6 +19,7 @@ GNU General Public License for more details.
+ 
+ static struct
+ {
++	TRICULLSTYLE cullFace;
+ 	int    renderMode;                      // override kRenderMode from TriAPI
+ 	vec4_t triRGBA;
+ } ds;
+@@ -218,6 +219,21 @@ TriVertex3f
+ 
+ =============
+ */
++static void TriDrawTriangle( finalvert_t *a, finalvert_t *b, finalvert_t *c )
++{
++	// The rasterizer accepts one winding. Mirroring a weapon reverses it;
++	// TRI_NONE must accept either winding for overview tiles and sprites.
++	if( ds.cullFace == TRI_NONE )
++	{
++		R_RenderTriangle( a, b, c );
++		R_RenderTriangle( c, b, a );
++	}
++	else if( tr.fFlipViewModel )
++		R_RenderTriangle( c, b, a );
++	else
++		R_RenderTriangle( a, b, c );
++}
++
+ void GAME_EXPORT TriVertex3f( float x, float y, float z )
+ {
+ 	if( mode == TRI_TRIANGLES )
+@@ -226,8 +242,7 @@ void GAME_EXPORT TriVertex3f( float x, float y, float z )
+ 		vertcount++;
+ 		if( vertcount == 3 )
+ 		{
+-			R_RenderTriangle( &triv[0], &triv[1], &triv[2] );
+-			// R_RenderTriangle( &triv[2], &triv[1], &triv[0] );
++			TriDrawTriangle( &triv[0], &triv[1], &triv[2] );
+ 			vertcount = 0;
+ 		}
+ 	}
+@@ -237,8 +252,7 @@ void GAME_EXPORT TriVertex3f( float x, float y, float z )
+ 		vertcount++;
+ 		if( vertcount >= 3 )
+ 		{
+-			R_RenderTriangle( &triv[0], &triv[1], &triv[2] );
+-			// R_RenderTriangle( &triv[2], &triv[1], &triv[0] );
++			TriDrawTriangle( &triv[0], &triv[1], &triv[2] );
+ 			triv[1] = triv[2];
+ 			vertcount = 2;
+ 		}
+@@ -253,9 +267,9 @@ void GAME_EXPORT TriVertex3f( float x, float y, float z )
+ 		if( vertcount >= 3 )
+ 		{
+ 			if( vertcount & 1 )
+-				R_RenderTriangle( &triv[0], &triv[1], &triv[2] );
++				TriDrawTriangle( &triv[0], &triv[1], &triv[2] );
+ 			else
+-				R_RenderTriangle( &triv[2], &triv[1], &triv[0] );
++				TriDrawTriangle( &triv[2], &triv[1], &triv[0] );
+ 		}
+ 	}
+ }
+@@ -337,6 +351,7 @@ TriCullFace
+ */
+ void GAME_EXPORT TriCullFace( TRICULLSTYLE mode )
+ {
++	ds.cullFace = mode;
+ }
+ 
+ /*

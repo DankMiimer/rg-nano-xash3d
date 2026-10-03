@@ -6,9 +6,9 @@ This documents the installation from which the support recipes were developed. E
 |---|---|---|
 | Base `xash3d`, `libxash.so`, filesystem library, menu library and bundled dependencies | [Sn3zee-cmds/XASH3DFS](https://github.com/Sn3zee-cmds/XASH3DFS), `xash3dfs` release, `XASH3DFS.opk.-.LATEST` | Base-package reference, digest check and local assembly script; no binaries |
 | Half-Life ARM client/server libraries | The same external OPK | No binaries; corresponding port source has not been established |
-| Counter-Strike ARM client and server | [Velaron/cs16-client](https://github.com/Velaron/cs16-client) at `e30e27c3bd890f731ad7921d9c876d171aea4b32`, built with FunKey SDK 2.3.0 | Source patch and build recipe; upstream sources fetched at build time |
+| Counter-Strike ARM client and server | [Velaron/cs16-client](https://github.com/Velaron/cs16-client) at `e30e27c3bd890f731ad7921d9c876d171aea4b32`, built with FunKey SDK 2.3.0 | Version-compatibility and spectator-inset policy patches plus build recipe; upstream sources fetched at build time |
 | ReGameDLL_CS, mainui_cpp, MiniUTL and YaPB source dependencies | Pinned submodules of that CS16Client commit | Submodule references; no vendored source trees. YaPB was built during exploration but is not activated or installed by this recipe |
-| Software renderer | [FWGS/xash3d-fwgs](https://github.com/FWGS/xash3d-fwgs) at `e3e459bb6735c9e6a6bf18658f637bc71cdc73df` | Texture-capacity/clipping patch, standalone build recipe and clipping test |
+| Software renderer | [FWGS/xash3d-fwgs](https://github.com/FWGS/xash3d-fwgs) at `e3e459bb6735c9e6a6bf18658f637bc71cdc73df` | Texture-capacity/clipping and triangle-winding/culling patches, standalone build recipe and geometry tests |
 | Private SDL library | Nano firmware's `/usr/lib/libSDL-1.2.so.0` | Recipe which copies it locally and changes the embedded ALSA device string; no firmware binary |
 | Automatic overclock helper | [DankMiimer/nanocraft/src/nano-clk.c](https://github.com/DankMiimer/nanocraft/blob/8e4c9a88726a69b1fc90110767d3cc630e740330/src/nano-clk.c) | Original GPL helper source and credit; file digest recorded |
 | Launchers, controls, RNG helper and build/installation tools | Created for this setup | Source under GPL-3.0-or-later |
@@ -21,8 +21,22 @@ This documents the installation from which the support recipes were developed. E
 
 At the time of preparation, the XASH3DFS repository exposes a README, packaged OPK and icon, rather than the corresponding Nano port source. The upstream FWGS revision supplies the renderer source used here, but does not establish that it is complete corresponding source for the modified Nano engine or the supplied Half-Life libraries.
 
-Accordingly, this repository is openly licensed **support code and patches**. It does not claim to relicense the entire installed runtime. Third-party compiled runtime libraries and game assets are excluded from Git and from repository releases. A fully source-buildable Nano port would require obtaining or reconstructing the missing port-specific source and confirming its dependencies and licenses.
+Accordingly, this repository is openly licensed **support code and patches**. It does not claim to relicense the entire installed runtime. Third-party compiled runtime libraries and game assets are excluded from Git and from repository releases. The legacy assembly still has that limitation. The separate native recipe reconstructs the hardware support from upstream source and small published patches; compilation has passed, while device parity must be established before adopting it.
 
 The assembly recipe patches two exact binary strings locally: `/dev/random` becomes a launcher-created `/tmp/xash-r` symlink to `/dev/urandom`, and the private Nano SDL's `/dev/dsp` device name becomes ALSA `default`. It deliberately rejects unexpected input strings rather than guessing offsets.
 
 There are no Steam credentials, account files, personal saves, RNG seeds, device identifiers or machine-specific paths in the published source.
+
+## Independent native recipe
+
+| Component | Source and treatment |
+|---|---|
+| Engine, filesystem, software renderer and default menu | FWGS/xash3d-fwgs at the pinned renderer revision; gitlink-pinned submodules; published framebuffer, musl timer, Linux entropy, evdev input-record, console logging and ALSA streaming patches |
+| Half-Life ARM client/server | FWGS/hlsdk-portable at `9c45ba22fba98517fdd303d446c78dafcf74fd07`; Valve SDK notice retained in `licenses/hlsdk-portable.txt` |
+| bzip2, Ogg/Vorbis, C++ and GCC runtime dependencies | FunKey SDK 2.3.0 sysroot, resolved recursively by ELF NEEDED entries during private assembly; no OPK libraries or SDL used |
+| musl libc, ALSA and hardware drivers | Existing FunKeyOS firmware; ALSA uses the device’s existing output stack |
+| Commercial resources, icons, font and optional NAV | Same user-supplied inputs as above; no assets published |
+
+`source-runtime.json` in each private native assembly records component/dependency hashes and that no external OPK was used. This documents the new build's provenance; it does not assert that it reproduces Sn3zee's implementation. Upstream credits remain intact, and no private port binary is reverse-engineered into the new engine.
+
+The Half-Life pin precedes the September 2026 freevgui SetPaintOffset extension, which the August engine does not implement. Engine and client revisions must be aligned when updating either.

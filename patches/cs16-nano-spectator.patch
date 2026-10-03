@@ -1,0 +1,42 @@
+diff --git a/cl_dll/hud_spectator.cpp b/cl_dll/hud_spectator.cpp
+index 12be7d2..9fea1a2 100644
+--- a/cl_dll/hud_spectator.cpp
++++ b/cl_dll/hud_spectator.cpp
+@@ -261,6 +261,7 @@ int CHudSpectator::Init()
+ 	m_HUD_saytext 	= gEngfuncs.pfnRegisterVariable("hud_saytext_internal","1",0);
+ 	m_pip			= gEngfuncs.pfnRegisterVariable("spec_pip_internal","1",0);
+ 	m_lastAutoDirector = 0.0f;
++	gEngfuncs.pfnRegisterVariable("spec_pip_allow", "1", FCVAR_ARCHIVE);
+ 	
+ 	if ( !m_drawnames || !m_drawcone || !m_drawstatus || !m_autoDirector || !m_pip )
+ 	{
+@@ -923,6 +924,8 @@ void CHudSpectator::HandleButtonsUp( int ButtonPressed )
+ 
+ void CHudSpectator::SetModes(int iNewMainMode, int iNewInsetMode)
+ {
++	// Small-device profiles can prohibit the second spectator render view.
++	if( !CVAR_GET_FLOAT("spec_pip_allow") ) iNewInsetMode = INSET_OFF;
+ 	// if value == -1 keep old value
+ 	if ( iNewMainMode == -1 )
+ 		iNewMainMode = g_iUser1;
+@@ -1756,6 +1759,7 @@ void CHudSpectator::CheckSettings()
+ 
+ int CHudSpectator::ToggleInset(bool allowOff)
+ {
++	if( !CVAR_GET_FLOAT("spec_pip_allow") ) return INSET_OFF;
+ 	int newInsetMode = (int)m_pip->value + 1;
+ 
+ 	if ( g_iUser1 < OBS_MAP_FREE )
+diff --git a/cl_dll/view.cpp b/cl_dll/view.cpp
+index b3a5651..eb729a0 100644
+--- a/cl_dll/view.cpp
++++ b/cl_dll/view.cpp
+@@ -1586,6 +1586,8 @@ V_CalcSpectatorRefdef
+ */
+ void V_CalcSpectatorRefdef ( struct ref_params_s * pparams )
+ {
++	// Also cover direct cvar/console changes before requesting another view.
++	if( !CVAR_GET_FLOAT("spec_pip_allow") ) gHUD.m_Spectator.m_pip->value = INSET_OFF;
+ 	static vec3_t			velocity ( 0.0f, 0.0f, 0.0f);
+ 
+ 	static int lastWeaponModelIndex = 0;

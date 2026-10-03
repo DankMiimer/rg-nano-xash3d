@@ -1,0 +1,79 @@
+diff --git a/engine/platform/linux/vid_fbdev.c b/engine/platform/linux/vid_fbdev.c
+index 4a338e1..d800e1f 100644
+--- a/engine/platform/linux/vid_fbdev.c
++++ b/engine/platform/linux/vid_fbdev.c
+@@ -28,6 +28,17 @@ struct fb_s
+ 
+ #define DEFAULT_FBDEV "/dev/fb0"
+ 
++platform_orientation_t Platform_GetDisplayOrientation( void )
++{
++	return ORIENTATION_LANDSCAPE;
++}
++
++void VID_Info_f( void )
++{
++	Con_Printf( "Framebuffer: %ux%u, %u bpp, %u byte pitch\n",
++		fb.vinfo.xres, fb.vinfo.yres, fb.vinfo.bits_per_pixel, fb.finfo.line_length );
++}
++
+ void Platform_Minimize_f( void )
+ {
+ 	// stub
+@@ -53,6 +64,7 @@ void FB_GetScreenRes( int *x, int *y )
+ qboolean R_Init_Video( ref_graphic_apis_t type )
+ {
+ 	fb.fd = -1;
++	fb.tty_fd = -1;
+ 
+ 	if( type != REF_SOFTWARE )
+ 		return false;
+@@ -66,13 +78,20 @@ qboolean R_Init_Video( ref_graphic_apis_t type )
+ 	if( fb.fd < 0 )
+ 	{
+ 		Con_Printf( S_ERROR "failed to open framebuffer device: %s\n", strerror(errno));
++		return false;
+ 	}
+ 
+ 	if( Sys_CheckParm( "-ttygfx" ) )
+ 		fb.tty_fd = open( "/dev/tty", O_RDWR ); // only need this to set graphics mode, optional
+ 
+-	ioctl(fb.fd, FBIOGET_FSCREENINFO, &fb.finfo);
+-	ioctl(fb.fd, FBIOGET_VSCREENINFO, &fb.vinfo);
++	if( ioctl( fb.fd, FBIOGET_FSCREENINFO, &fb.finfo ) < 0 ||
++		ioctl( fb.fd, FBIOGET_VSCREENINFO, &fb.vinfo ) < 0 )
++	{
++		close( fb.fd );
++		fb.fd = -1;
++		return false;
++	}
++	fb.vinfo.xoffset = fb.vinfo.yoffset = 0;
+ 
+ 	qboolean retval = VID_SetMode();
+ 	if( !retval )
+@@ -208,7 +227,11 @@ qboolean SW_CreateBuffer( int width, int height, uint *stride, uint *bpp, uint *
+ 	}
+ 
+ 	*bpp = fb.vinfo.bits_per_pixel >> 3;
+-	*stride = fb.vinfo.xres_virtual;
++	if( !*bpp || !fb.finfo.line_length || fb.finfo.line_length % *bpp )
++		return false;
++	*stride = fb.finfo.line_length / *bpp;
++	if( *stride < width || (size_t)fb.finfo.line_length * height > fb.finfo.smem_len )
++		return false;
+ 	*r = FB_BF_TO_MASK(fb.vinfo.red);
+ 	*g = FB_BF_TO_MASK(fb.vinfo.green);
+ 	*b = FB_BF_TO_MASK(fb.vinfo.blue);
+@@ -240,8 +263,11 @@ qboolean SW_CreateBuffer( int width, int height, uint *stride, uint *bpp, uint *
+ 		munmap(fb.map, fb.finfo.smem_len);
+ 	fb.map = mmap(0, fb.finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fb.fd, 0);
+ 
+-	if( !fb.map )
++	if( fb.map == MAP_FAILED )
++	{
++		fb.map = NULL;
+ 		return false;
++	}
+ 	return true;
+ }
+ 

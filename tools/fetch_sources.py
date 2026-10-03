@@ -11,8 +11,8 @@ LOCK = json.loads((ROOT/'sources.lock.json').read_text())
 def run(*args, cwd=None):
     subprocess.run(args, cwd=cwd, check=True)
 
-def fetch(name):
-    target = ROOT/'upstream'/name
+def fetch(name, source_root=None):
+    target = (source_root or ROOT/'upstream')/name
     spec = LOCK[name]
     if not target.exists():
         target.mkdir(parents=True)
@@ -37,5 +37,9 @@ def apply(target, filename):
     run('git', 'apply', str(patch), cwd=target)
 
 if __name__ == '__main__':
-    apply(fetch('xash3d'), 'renderer-nano.patch')
-    apply(fetch('cs16-client'), 'cs16-nano-4141.patch')
+    renderer=fetch('xash3d')
+    apply(renderer, 'renderer-nano.patch')
+    apply(renderer, 'renderer-nano-triangles.patch')
+    client=fetch('cs16-client')
+    apply(client, 'cs16-nano-4141.patch')
+    apply(client, 'cs16-nano-spectator.patch')

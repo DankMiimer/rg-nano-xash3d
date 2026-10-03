@@ -1,0 +1,17 @@
+diff --git a/3rdparty/mbedtls/xash_psa_config.h b/3rdparty/mbedtls/xash_psa_config.h
+index 260fb20..0ff9923 100644
+--- a/3rdparty/mbedtls/xash_psa_config.h
++++ b/3rdparty/mbedtls/xash_psa_config.h
+@@ -1,6 +1,12 @@
+ #ifndef XASH_PSA_CONFIG_H
+ #define XASH_PSA_CONFIG_H
+ 
++#if defined( __linux__ )
++/* FunKeyOS uses Linux 4.14, where /dev/random drains and blocks on relaunch.
++   The launcher initializes the kernel RNG from a private installation seed. */
++#define MBEDTLS_PLATFORM_DEV_RANDOM "/dev/urandom"
++#endif
++
+ #if (defined( _WIN32 ) && !defined( _WIN64 )) || defined( __vita__ ) || defined( __SWITCH__ )
+ /* WinXP, PSVita and NSwitch use entropy paths upstream doesn't cover.
+    compat.c provides mbedtls_platform_get_entropy() for all three. */

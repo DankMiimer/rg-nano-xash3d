@@ -26,5 +26,10 @@
     "mainui_cpp": "6cb52ee726b8f0fb233be4fe01aad91037494e3e",
     "miniutl": "048a416f4c54c501dfd728fd792bfdc9f2883f51",
     "yapb": "4967a220ba3a58c461ee1cef8b6fb37c6fd93b5e"
+  },
+  "hlsdk": {
+    "url": "https://github.com/FWGS/hlsdk-portable.git",
+    "commit": "9c45ba22fba98517fdd303d446c78dafcf74fd07",
+    "license": "Valve Half-Life 1 SDK license; free distribution only, retain notices"
   }
 }

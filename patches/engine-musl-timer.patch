@@ -1,0 +1,18 @@
+diff --git a/engine/platform/linux/sys_linux.c b/engine/platform/linux/sys_linux.c
+index e131187..2fadc61 100644
+--- a/engine/platform/linux/sys_linux.c
++++ b/engine/platform/linux/sys_linux.c
+@@ -155,8 +155,13 @@ void Linux_SetTimer( float tm )
+ 		sigaction( DEBUG_TIMER_SIGNAL, &sa, NULL );
+ 		// this path availiable in POSIX, but may signal wrong thread...
+ 		// sev.sigev_notify = SIGEV_SIGNAL;
++#if defined( __GLIBC__ )
+ 		sev.sigev_notify = SIGEV_THREAD_ID;
+ 		sev.sigev_notify_thread_id = Linux_GetProcessID();
++#else
++		// musl does not expose glibc's thread-directed sigevent fields.
++		sev.sigev_notify = SIGEV_SIGNAL;
++#endif
+ 		sev.sigev_signo = DEBUG_TIMER_SIGNAL;
+ 		sev.sigev_value.sival_ptr = &timerid;
+ 		timer_create( CLOCK_REALTIME, &sev, &timerid );
