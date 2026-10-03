@@ -30,15 +30,15 @@ Our implementation uses hold duration: 70 degrees/second yaw, 0.15 seconds of pr
 
 | Group | Default | Placement / treatment |
 |---|---|---|
-| Health, armor, ammo | 1.125x | Whole blocks measured, health left and ammo right, approximately one physical pixel inside the bottom edge. Armor follows the reserved health width. |
+| Health, armor, ammo | 1.125x | Whole blocks measured, health left and ammo right, approximately one physical pixel inside the bottom edge. Armor follows the reserved health width. CS ammo retains both three-digit fields with compact separator spacing, avoiding the armor group. Reserve-only and secondary ammo share the right edge. |
 | CS timer | 1.125x | Centered row immediately above the bottom counters to prevent overlap on the square screen. |
-| CS money | 1.125x | Upper right; bounds include money-change indicators. |
-| Status icons | 1.125x | Left side, original vertical stacking; corrected left anchor. |
+| CS money | 1.125x | Top-right edge; temporary gain/loss amounts appear to the left of the balance. Kill notices start just below it. |
+| Status icons | 1 source pixel per display pixel | Original buy-zone/bomb artwork, typically 32×32, without downsampling; left edge with four-pixel vertical gaps. |
 | CS radar | 0.5x | Upper left, map and markers share one transform. |
 | Team/buy text | 1.25x | Original number-menu text and spacing transformed together; user confirmed good size. |
 | CS dynamic crosshair | At least five-pixel arms | Original colors, fades and dynamic spread; four mirrored rectangles share one physical center, three-pixel minimum gap and one-pixel stroke. |
 | Static crosshair | 2x | Original sprites; scope overlays excluded from enlargement. |
-| Main/pause buttons | 2x | Original menu font, row spacing and hitboxes resized; engine and CS menu libraries both patched; font rasterized at the larger size and cached, including CS's additional Readme row. Nano uses font text rather than stretched picture-button labels; the decorative title and debug Console entry are hidden to keep the rows unobstructed. Nano uses font text rather than stretched picture-button labels; the decorative title and debug Console entry are hidden to keep the rows unobstructed. |
+| Main/pause buttons | 2x | Original menu font, row spacing and hitboxes resized; engine and CS menu libraries both patched; font rasterized at the larger size and cached, including CS's additional Readme row. Nano uses font text rather than stretched picture-button labels; the decorative title and debug Console entry are hidden to keep the rows unobstructed. |
 
 The overall virtual HUD scale remains 0.65. Per-group transforms preserve aspect ratios and round destination edges to physical pixels. Every scope restores scale, anchors and offsets, including early returns and nested draws. Source sprite rectangles stay unchanged. Texture UVs must always be normalized: an initial crisp-sampling experiment omitted normalization and hid the HUD; the correction is covered by a regression test. Thin positive fills retain at least one pixel.
 
@@ -52,6 +52,6 @@ The CS crosshair is laid out directly in physical pixels to avoid truncation thr
 4. Measure a repeatable CS round and HL campaign scene for frame-time, memory/swap and audio stalls at 1200 MHz. Optimize only demonstrated bottlenecks.
 5. Keep source-built entries separate until parity and extended stability are established; publish source/recipes without game assets, extracted icons or unlicensed fonts/navigation.
 
-Run `NANO_NATIVE_DIR=/path/to/native-build python3 tests/test_nano_look_hud.py` under Linux after fetching/building. It compiles actual client yaw functions and engine HUD functions with AddressSanitizer/UndefinedBehaviorSanitizer, and exercises frame rates, reversals, pitch/strafe invariance, nested scopes, edge placement, symmetric crosshair geometry and normalized sprite UVs.
+Run `NANO_NATIVE_DIR=/path/to/native-build python3 tests/test_nano_look_hud.py` under Linux after fetching/building. It compiles actual client yaw functions and engine HUD functions with AddressSanitizer/UndefinedBehaviorSanitizer, and exercises frame rates, reversals, pitch/strafe invariance, nested scopes, edge placement, symmetric crosshair geometry normalized sprite UVs, full health/armor alongside three-digit ammo, top-edge money and death-notice clearance.
 
 `test_nano_menu.py` compiles both real menu arrangement methods and font-cache method against a small host harness; it checks maximum rows, late visibility changes and reuse/invalidation of the enlarged font.

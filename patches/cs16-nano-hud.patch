@@ -76,14 +76,53 @@
  	if( gHUD.m_iHideHUDDisplay & ( HIDEHUD_MONEY | HIDEHUD_ALL ) )
  		return 1;
  
-@@ -83,6 +86,7 @@
+@@ -83,6 +86,12 @@
  
  	int x = ScreenWidth - iDollarWidth * 7;
  	int y = MONEY_YPOS;
-+	nanoScope.Place(x, y-m_hDollar.rect.Height()*1.5f, x+iDollarWidth+5*gHUD.GetSpriteRect(gHUD.m_HUD_number_0).Width(), y+max(m_hDollar.rect.Height(),gHUD.m_iFontHeight), 1, 0);
++	bool nanoTop = gEngfuncs.pfnGetCvarFloat("nano_hud_profile") != 0;
++	int balanceWidth = iDollarWidth+5*gHUD.GetSpriteRect(gHUD.m_HUD_number_0).Width();
++	nanoScope.Place(x, y, x+balanceWidth, y+max(m_hDollar.rect.Height(),gHUD.m_iFontHeight), 1, 0);
++	// The balance stays on the top edge; transient changes use the space to its left.
++	int deltaX = nanoTop ? x-balanceWidth-6 : x;
++	int deltaY = nanoTop ? y : y-m_hDollar.rect.Height()*1.5f;
  
  	if( m_iBlinkAmt )
  	{
+@@ -100,7 +109,6 @@
+ 		if( m_iDelta != 0 )
+ 		{
+ 			int iDeltaR, iDeltaG, iDeltaB;
+-			int iDollarHeight = m_hDollar.rect.Height();
+ 			int iDeltaAlpha = 255 - interpolate * (255);
+ 
+ 			DrawUtils::UnpackRGB  (iDeltaR, iDeltaG, iDeltaB, m_iDelta < 0 ? RGB_REDISH : RGB_GREENISH);
+@@ -114,7 +122,7 @@
+ 
+ 				// draw delta
+ 				SPR_Set(m_hPlus.spr, iDeltaR, iDeltaG, iDeltaB );
+-				SPR_DrawAdditive(0, x, y - iDollarHeight * 1.5, &m_hPlus.rect );
++				SPR_DrawAdditive(0, deltaX, deltaY, &m_hPlus.rect );
+ 			}
+ 			else if( m_iDelta < 0)
+ 			{
+@@ -123,13 +131,13 @@
+ 				b = (RGB_REDISH & 0xFF) - interpolate * (RGB_REDISH & 0xFF);
+ 
+ 				SPR_Set(m_hMinus.spr, iDeltaR, iDeltaG, iDeltaB );
+-				SPR_DrawAdditive(0, x, y - iDollarHeight * 1.5, &m_hMinus.rect );
++				SPR_DrawAdditive(0, deltaX, deltaY, &m_hMinus.rect );
+ 			}
+ 
+-			DrawUtils::DrawHudNumber2( x + iDollarWidth, y - iDollarHeight * 1.5 , false, 5,
++			DrawUtils::DrawHudNumber2( deltaX + iDollarWidth, deltaY, false, 5,
+ 									   m_iDelta < 0 ? -m_iDelta : m_iDelta,
+ 									   iDeltaR, iDeltaG, iDeltaB);
+-			FillRGBA(x + iDollarWidth / 4, y - iDollarHeight * 1.5 + gHUD.m_iFontHeight / 4, 2, 2, iDeltaR, iDeltaG, iDeltaB, iDeltaAlpha );
++			FillRGBA(deltaX + iDollarWidth / 4, deltaY + gHUD.m_iFontHeight / 4, 2, 2, iDeltaR, iDeltaG, iDeltaB, iDeltaAlpha );
+ 		}
+ 		else DrawUtils::UnpackRGB( r, g, b, gHUD.m_iDefaultHUDColor );
+ 	}
 --- a/cl_dll/hud/timer.cpp
 +++ b/cl_dll/hud/timer.cpp
 @@ -31,6 +31,7 @@
@@ -123,21 +162,45 @@
  #include "cl_util.h"
  #include "const.h"
  #include "entity_state.h"
-@@ -51,11 +52,14 @@
+@@ -51,18 +52,28 @@
  // Draw status icons along the left-hand side of the screen
  int CHudStatusIcons::Draw( float flTime )
  {
-+	NanoHudScope nanoScope("nano_hud_side", 0, 0.5);
++	NanoHudScope nanoScope("nano_hud_identity", 0, 0);
 +
  	if (gEngfuncs.IsSpectateOnly())
  		return 1;
  	// find starting position to draw from, along right-hand side of screen
  	int x = 5;
  	int y = ScreenHeight / 2;
-+	nanoScope.Place(x, 0, x, ScreenHeight, 0, 0.5, 2, 0);
++	bool nanoPixels = gEngfuncs.pfnGetCvarFloat("nano_hud_profile") != 0;
++	float oldPixels = gEngfuncs.pfnGetCvarFloat("nano_hud_pixel_coordinates");
++	if (nanoPixels) {
++		// Keep every pixel of the original 32x32 buy/bomb artwork, with no resampling.
++		gEngfuncs.Cvar_SetValue("nano_hud_pixel_coordinates", 1);
++		x = 2;
++		y = (int)floorf(ScreenHeight*gHUD.m_flScale*0.5f + 0.5f);
++	}
  
  	// loop through icon list, and draw any valid icons drawing up from the middle of screen
  	for ( int i = 0; i < MAX_ICONSPRITES; i++ )
+ 	{
+ 		if ( m_IconList[i].spr )
+ 		{
+-			y -= ( m_IconList[i].rc.Height() ) + 5;
++			y -= ( m_IconList[i].rc.Height() ) + (nanoPixels ? 4 : 5);
+ 			
+ 			if( g_bInBombZone && !strcmp(m_IconList[i].szSpriteName, "c4") && ((int)(flTime * 10) % 2))
+ 				SPR_Set( m_IconList[i].spr, 255, 16, 16 );
+@@ -71,6 +82,8 @@
+ 		}
+ 	}
+ 	
++	if (nanoPixels) gEngfuncs.Cvar_SetValue("nano_hud_pixel_coordinates", oldPixels);
++
+ 	return 1;
+ }
+ 
 --- a/cl_dll/menu.cpp
 +++ b/cl_dll/menu.cpp
 @@ -18,6 +18,7 @@
@@ -204,15 +267,64 @@
  	// SPR_Draw Ammo
  	if ((pw->iAmmoType < 0) && (pw->iAmmo2Type < 0))
  		return 0;
-@@ -1104,6 +1107,7 @@
+@@ -1104,6 +1107,13 @@
  
  	// Does this weapon have a clip?
  	y = ScreenHeight - gHUD.m_iFontHeight - gHUD.m_iFontHeight/2;
-+	nanoScope.Place(ScreenWidth-8*AmmoWidth-m_pWeapon->rcAmmo.Width(), y-m_pWeapon->rcAmmo.Height()/8, ScreenWidth, y+max(gHUD.m_iFontHeight,m_pWeapon->rcAmmo.Height()-m_pWeapon->rcAmmo.Height()/8), 1, 1);
++	bool nanoCompact = gEngfuncs.pfnGetCvarFloat("nano_hud_profile") != 0;
++	// Reserve both three-digit fields, but only a small gap around the divider.
++	int nanoGap = max(1, AmmoWidth/20);
++	int nanoBar = max(1, AmmoWidth/10);
++	int nanoAmmoWidth = 6*AmmoWidth + 2*nanoGap + nanoBar + m_pWeapon->rcAmmo.Width();
++	nanoScope.Place(ScreenWidth-nanoAmmoWidth, y-m_pWeapon->rcAmmo.Height()/8, ScreenWidth,
++		y+max(gHUD.m_iFontHeight,m_pWeapon->rcAmmo.Height()-m_pWeapon->rcAmmo.Height()/8), 1, 1);
  
  	// Does weapon have any ammo at all?
  	if (m_pWeapon->iAmmoType > 0)
-@@ -1171,6 +1175,8 @@
+@@ -1114,19 +1124,19 @@
+ 		{
+ 			// room for the number and the '|' and the current ammo
+ 			
+-			x = ScreenWidth - (8 * AmmoWidth) - iIconWidth;
++			x = nanoCompact ? ScreenWidth-nanoAmmoWidth : ScreenWidth - (8 * AmmoWidth) - iIconWidth;
+ 			x = DrawUtils::DrawHudNumber(x, y, iFlags | DHN_3DIGITS, pw->iClip, r, g, b);
+ 
+-			int iBarWidth =  AmmoWidth/10;
+-
+-			x += AmmoWidth/2;
++			int iBarWidth = nanoCompact ? nanoBar : AmmoWidth/10;
++
++			x += nanoCompact ? nanoGap : AmmoWidth/2;
+ 
+ 			DrawUtils::UnpackRGB( r, g, b, gHUD.m_iDefaultHUDColor );
+ 
+ 			// draw the | bar
+ 			FillRGBA(x, y, iBarWidth, gHUD.m_iFontHeight, r, g, b, a);
+ 
+-			x += iBarWidth + AmmoWidth/2;;
++			x += iBarWidth + (nanoCompact ? nanoGap : AmmoWidth/2);
+ 
+ 			// GL Seems to need this
+ 			DrawUtils::ScaleColors(r, g, b, a );
+@@ -1137,7 +1147,7 @@
+ 		else
+ 		{
+ 			// SPR_Draw a bullets only line
+-			x = ScreenWidth - 4 * AmmoWidth - iIconWidth;
++			x = ScreenWidth - (nanoCompact ? 3 : 4) * AmmoWidth - iIconWidth;
+ 			x = DrawUtils::DrawHudNumber(x, y, iFlags | DHN_3DIGITS, gWR.CountAmmo(pw->iAmmoType), r, g, b);
+ 		}
+ 
+@@ -1156,7 +1166,7 @@
+ 		if ((pw->iAmmo2Type != 0) && (gWR.CountAmmo(pw->iAmmo2Type) > 0))
+ 		{
+ 			y -= gHUD.m_iFontHeight + gHUD.m_iFontHeight/4;
+-			x = ScreenWidth - 4 * AmmoWidth - iIconWidth;
++			x = ScreenWidth - (nanoCompact ? 3 : 4) * AmmoWidth - iIconWidth;
+ 			x = DrawUtils::DrawHudNumber(x, y, iFlags|DHN_3DIGITS, gWR.CountAmmo(pw->iAmmo2Type), r, g, b);
+ 
+ 			// Draw the ammo Icon
+@@ -1171,6 +1181,8 @@
  
  void CHudAmmo::DrawSpriteCrosshair()
  {
@@ -221,7 +333,7 @@
  	int x, y;
  
  	if( g_iUser1 && g_iUser1 != OBS_IN_EYE )
-@@ -1706,6 +1712,25 @@
+@@ -1706,6 +1718,25 @@
  		flCrosshairDistance = m_flCrosshairDistance;
  	}
  
@@ -247,3 +359,37 @@
  	// drawing
  	if ( g_iXash && xhair_enable->value )
  	{
+--- a/cl_dll/death.cpp
++++ b/cl_dll/death.cpp
+@@ -16,6 +16,7 @@
+ // death notice
+ //
+ #include "hud.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ 
+@@ -80,6 +81,8 @@
+ 
+ int CHudDeathNotice :: Draw( float flTime )
+ {
++	NanoHudScope nanoScope("nano_hud_identity", 0, 0);
++	bool nanoTop = gEngfuncs.pfnGetCvarFloat("nano_hud_profile") != 0;
+ 	int x, y, r, g, b, i;
+ 
+ 	for( i = 0; i < MAX_DEATHNOTICES; i++ )
+@@ -111,8 +114,13 @@
+ 				y = ScreenHeight / 5 + 2 + (20 * i);
+ 			}
+ 
++			if (nanoTop && !g_iUser1) {
++				int moneyHeight = max(gHUD.m_iFontHeight, gHUD.GetSpriteRect(gHUD.GetSpriteIndex("dollar")).Height());
++				y = (int)ceilf(2 + moneyHeight*gEngfuncs.pfnGetCvarFloat("nano_hud_side") + 5) + 20*i;
++			}
++
+ 			int id = (rgDeathNoticeList[i].iId == -1) ? m_HUD_d_skull : rgDeathNoticeList[i].iId;
+-			x = ScreenWidth - DrawUtils::ConsoleStringLen(rgDeathNoticeList[i].szVictim) - (gHUD.GetSpriteRect(id).Width());
++			x = ScreenWidth - (nanoTop ? 2 : 0) - DrawUtils::ConsoleStringLen(rgDeathNoticeList[i].szVictim) - (gHUD.GetSpriteRect(id).Width());
+ 			if( rgDeathNoticeList[i].iHeadShotId )
+ 				x -= gHUD.GetSpriteRect(m_HUD_d_headshot).Width();
+ 
