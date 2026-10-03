@@ -1,0 +1,30 @@
+{
+  "xash3d": {
+    "url": "https://github.com/FWGS/xash3d-fwgs.git",
+    "commit": "e3e459bb6735c9e6a6bf18658f637bc71cdc73df",
+    "license": "Mixed file-level licenses; renderer changes GPL-3.0-or-later"
+  },
+  "cs16-client": {
+    "url": "https://github.com/Velaron/cs16-client.git",
+    "commit": "e30e27c3bd890f731ad7921d9c876d171aea4b32",
+    "license": "GPL-2.0-or-later with Valve linking exception"
+  },
+  "nanocraft-clock": {
+    "url": "https://github.com/DankMiimer/nanocraft",
+    "commit": "8e4c9a88726a69b1fc90110767d3cc630e740330",
+    "file": "src/nano-clk.c",
+    "sha256": "b9c50fdf92308e25216a4af32eaa306461fb0ed1216623b36e87149f471cc229",
+    "license": "GPL-3.0 (upstream repository license)"
+  },
+  "xash3dfs-opk": {
+    "url": "https://github.com/Sn3zee-cmds/XASH3DFS/releases/download/xash3dfs/XASH3DFS.opk.-.LATEST",
+    "sha256": "f9308ca23f0c444c721edcea704c676c994d2be613f81827a60cfebacef03b83",
+    "source_status": "Packaged binaries. Corresponding port source not established. Not vendored or redistributed here."
+  },
+  "submodules": {
+    "ReGameDLL_CS": "7be9d59dca1ee11d270e4631d7e3be0c67a1a82b",
+    "mainui_cpp": "6cb52ee726b8f0fb233be4fe01aad91037494e3e",
+    "miniutl": "048a416f4c54c501dfd728fd792bfdc9f2883f51",
+    "yapb": "4967a220ba3a58c461ee1cef8b6fb37c6fd93b5e"
+  }
+}

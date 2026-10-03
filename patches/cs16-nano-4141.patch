@@ -1,0 +1,28 @@
+diff --git a/cl_dll/cdll_int.cpp b/cl_dll/cdll_int.cpp
+index 4f5a9e8..8d22c35 100644
+--- a/cl_dll/cdll_int.cpp
++++ b/cl_dll/cdll_int.cpp
+@@ -109,6 +109,12 @@ int DLLEXPORT Initialize( cl_enginefunc_t *pEnginefuncs, int iVersion )
+ 	CVAR_CREATE("cl_oldtouchmenus", "0", FCVAR_CLIENTDLL | FCVAR_ARCHIVE);
+ 
+ 	sscanf( CVAR_GET_STRING( "host_ver" ), "%d", &g_iXash );
++	gEngfuncs.Con_Printf( "Nano engine host_ver: %s\n", CVAR_GET_STRING( "host_ver" ) );
++	// XASH3DFS uses the modern semantic host_ver format, rather than
++	// the legacy numeric build expected by this client. The renderer
++	// and client API version checks remain in place.
++	if( !strncmp( CVAR_GET_STRING( "host_ver" ), "0.21", 4 ) )
++		g_iXash = MIN_XASH_VERSION;
+ 
+ 	Game_HookEvents();
+ 	CL_LoadParticleMan();
+@@ -425,7 +431,9 @@ int DLLEXPORT HUD_GetRenderInterface( int version, render_api_t *renderfuncs, re
+ 	// *callback = renderInterface;
+ 
+ 	// we have here a Host_Error, so check Xash for version
+-	if( g_iXash < MIN_XASH_VERSION )
++	// This specific FWGS 0.21 port reports legacy build 4141. Its
++	// renderer API was checked above; allow that port's build marker.
++	if( g_iXash < MIN_XASH_VERSION && g_iXash != 4141 )
+ 	{
+ 		gRenderAPI.Host_Error("Xash3D FWGS version check failed!\nPlease update your Xash3D FWGS!\n");
+ 	}

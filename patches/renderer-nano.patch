@@ -1,0 +1,43 @@
+--- a/ref/soft/r_draw.c
++++ b/ref/soft/r_draw.c
+@@ -41,10 +41,20 @@
+ 	qboolean transparent = false;
+ 	pixel_t  *buffer;
+ 
++	if( w <= 0 || h <= 0 || x >= vid.width || y >= vid.height || x <= -w || y <= -h )
++		return;
++
+ 	if( x < 0 )
+ 	{
+ 		s1 += ( -x ) * ( s2 - s1 ) / w;
++		w += x;
+ 		x = 0;
++	}
++	if( y < 0 )
++	{
++		t1 += ( -y ) * ( t2 - t1 ) / h;
++		h += y;
++		y = 0;
+ 	}
+ 	if( x + w > vid.width )
+ 	{
+@@ -57,7 +67,7 @@
+ 		h = vid.height - y;
+ 	}
+ 
+-	if( !pic->pixels[0] || s1 >= s2 || t1 >= t2 )
++	if( w <= 0 || h <= 0 || !pic->pixels[0] || s1 >= s2 || t1 >= t2 )
+ 		return;
+ 
+ 	// gEngfuncs.Con_Printf ("pixels is %p\n", pic->pixels[0] );
+--- a/ref/soft/r_local.h
++++ b/ref/soft/r_local.h
+@@ -48,7 +48,7 @@
+ #if XASH_LOW_MEMORY
+ 	#undef MAX_TEXTURES
+ 	#undef MAX_DECAL_SURFS
+-	#define MAX_TEXTURES    1024
++	#define MAX_TEXTURES    4096
+ 	#define MAX_DECAL_SURFS 256
+ #endif
+ 
