@@ -3,6 +3,7 @@
 Device checks were performed on an RG Nano with approximately 54 MiB of available system RAM, SD-backed swap and FunKeyOS 2.3.0.
 
 - The published build recipe passed from fresh pinned source checkouts using FunKey SDK 2.3.0, producing ARM CS client/server/menu libraries, the software renderer and static launch helpers.
+- Private runtime assembly passed using local Steam assets, the pinned base OPK and the Nano's SDL. The engine/SDL byte patches matched the working installation inputs, and regenerated icons had identical pixels. The fresh assembly was not installed over the existing device runtime.
 - Game icons were extracted from each local `game.ico`, packaged into the individual launchers, and verified against the installed Nano PNGs by SHA-256.
 - Both launcher paths set the CPU to 1200 MHz; hardware register readback confirmed the applied clock. Normal game-process exit restored 1008 MHz.
 - Half-Life rendered the opening campaign and created a quick-save. Full campaign completion has not been tested.
