@@ -7,7 +7,7 @@ Open-source launchers, controls, build recipes and source patches for running Ha
 ## Current behavior
 
 - Separate Half-Life and Counter-Strike entries in Native games, with icons extracted locally from each game's `game.ico`.
-- D-pad walks/turns; L/R strafe; X shoots; A uses; B jumps; Y reloads.
+- D-pad walks/turns; hold R for vertical look and strafing; precise camera speed by default, hold L for three times faster look. X shoots; A uses; B jumps; Y reloads.
 - HUD scale 0.65 for the Nano's 240×240 display.
 - Launchers set 1200 MHz and restore 1008 MHz when the game process exits.
 - Half-Life launches the opening campaign directly with the current launcher settings.
@@ -16,7 +16,7 @@ Open-source launchers, controls, build recipes and source patches for running Ha
 - The user confirmed menu navigation and sound on the established ports, and movement, shooting and sound on source-built Counter-Strike.
 - Software renderer permits 4096 textures and clips off-screen HUD graphics before accessing the framebuffer.
 
-See [CONTROLS.md](docs/CONTROLS.md) and [VALIDATION.md](docs/VALIDATION.md). These remain experimental ports: HUD graphics have rendering defects, and extended campaign/multiplayer stability has not been established.
+See [CONTROLS.md](docs/CONTROLS.md), [VALIDATION.md](docs/VALIDATION.md) and the [controller/HUD reuse research](docs/HUD-CONTROLLER-RESEARCH.md). These remain experimental ports: HUD graphics have rendering defects, and extended campaign/multiplayer stability has not been established.
 
 ## Build the source components
 

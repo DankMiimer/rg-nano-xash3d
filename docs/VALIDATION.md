@@ -34,4 +34,6 @@ Checks were performed on an RG Nano with 56,164 KiB total RAM, SD-backed swap an
 - A subsequent ordinary Counter-Strike launch stayed running during a short unattended smoke check and restored 1008 MHz on supervised exit. Its latest renderer was not separately checked on the physical screen during that run.
 - Fn + L/R is reserved for quick-save/load in both profiles; Counter-Strike menu choices 4/5 moved to Fn + Start + L/R. The engine explicitly rejects multiplayer saves, so CS bot rounds do not gain save-state support from these bindings.
 
+- The new shoulder profile was packaged and installed with configuration hashes checked in both runtimes. Source-built Counter-Strike loaded de_dust with the bindings at 1200 MHz. The user confirmed R look/strafe and L camera speed work perfectly. At the user's request the speeds were then reversed: 70/75 degrees per second by default, 210/225 while holding L, restored to slow on release. The reversal is configuration-only; physical feedback on the reversed speeds is pending.
+
 HUD scale is 0.65, but some sprites still render incorrectly. Initial loads and some scenes use substantial swap. Full campaign completion, extended multiplayer play, repeated suspend/resume and long sessions remain unverified. See [ROADMAP.md](ROADMAP.md) for the next improvements.
