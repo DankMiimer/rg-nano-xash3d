@@ -1,0 +1,102 @@
+--- a/engine/common/common.h
++++ b/engine/common/common.h
+@@ -957,3 +957,6 @@
+ #endif
+ 
+ #endif//COMMON_H
++
++void NanoLoadProbeBegin( const char *op );
++void NanoLoadProbeReady( void );
+--- a/engine/common/host.c
++++ b/engine/common/host.c
+@@ -1416,3 +1416,52 @@
+ 	Sys_RestoreCrashHandler();
+ 	Sys_CloseLog( reason );
+ }
++
++#include <unistd.h>
++
++/* Temporary load measurement; not part of the ordinary native recipe. */
++typedef struct { unsigned long long minor, major; long long rss, up; int valid; } nano_load_snapshot_t;
++static double nanoLoadStart;
++static unsigned nanoLoadSeq;
++static int nanoLoadPending;
++static char nanoLoadOp[32];
++static nano_load_snapshot_t nanoLoadBefore;
++static nano_load_snapshot_t NanoLoadSnapshot( void )
++{
++    nano_load_snapshot_t s = {0};
++    char buf[2048], *p; FILE *f = fopen("/proc/self/stat", "r");
++    if (f) {
++        if (fgets(buf, sizeof(buf), f) && (p = strrchr(buf, ')'))) {
++            p += 2;
++            for (int field = 3; field <= 24 && *p; field++) {
++                if (field == 10) s.minor = strtoull(p, NULL, 10);
++                if (field == 12) s.major = strtoull(p, NULL, 10);
++                if (field == 24) { s.rss = strtoll(p, NULL, 10) * (sysconf(_SC_PAGESIZE) / 1024); s.valid = 1; }
++                while (*p && *p != ' ') p++;
++                while (*p == ' ') p++;
++            }
++        }
++        fclose(f);
++    }
++    f = fopen("/proc/uptime", "r");
++    if (f) { double up = 0; if (fscanf(f, "%lf", &up) == 1) s.up = (long long)(up * 1000); fclose(f); }
++    return s;
++}
++void NanoLoadProbeBegin( const char *op )
++{
++    nanoLoadBefore = NanoLoadSnapshot();
++    Q_strncpy(nanoLoadOp, op, sizeof(nanoLoadOp));
++    nanoLoadSeq++; nanoLoadPending = 1;
++    fprintf(stderr, "nano-load-begin: seq=%u op=%s up_ms=%lld rss_kib=%lld\n", nanoLoadSeq, nanoLoadOp, nanoLoadBefore.up, nanoLoadBefore.rss);
++    nanoLoadStart = Platform_DoubleTime();
++}
++void NanoLoadProbeReady( void )
++{
++    if (!nanoLoadPending) return;
++    const double elapsed = Platform_DoubleTime() - nanoLoadStart;
++    const nano_load_snapshot_t s = NanoLoadSnapshot();
++    fprintf(stderr, "nano-load-ready: seq=%u op=%s duration_ms=%.3f start_up_ms=%lld end_up_ms=%lld valid=%d minflt=%llu majflt=%llu rss_before_kib=%lld rss_after_kib=%lld\n",
++        nanoLoadSeq, nanoLoadOp, elapsed * 1000, nanoLoadBefore.up, s.up, s.valid && nanoLoadBefore.valid,
++        s.minor - nanoLoadBefore.minor, s.major - nanoLoadBefore.major, nanoLoadBefore.rss, s.rss);
++    nanoLoadPending = 0;
++}
+--- a/engine/server/sv_cmds.c
++++ b/engine/server/sv_cmds.c
+@@ -196,6 +196,7 @@
+ */
+ static void SV_Map_f( void )
+ {
++    NanoLoadProbeBegin("map");
+ 	char	mapname[MAX_QPATH];
+ 
+ 	if( Cmd_Argc() != 2 )
+--- a/engine/server/sv_save.c
++++ b/engine/server/sv_save.c
+@@ -2035,6 +2035,7 @@
+ */
+ void SV_ChangeLevel( qboolean loadfromsavedgame, const char *mapname, const char *start, qboolean background )
+ {
++    NanoLoadProbeBegin("transition");
+ 	char		level[MAX_QPATH];
+ 	char		oldlevel[MAX_QPATH];
+ 	char		_startspot[MAX_QPATH];
+@@ -2110,6 +2111,7 @@
+ */
+ qboolean SV_LoadGame( const char *pPath )
+ {
++    NanoLoadProbeBegin("save-load");
+ 	qboolean		validload = false;
+ 	GAME_HEADER	gameHeader;
+ 	file_t		*pFile;
+--- a/engine/client/cl_main.c
++++ b/engine/client/cl_main.c
+@@ -348,6 +348,7 @@
+ 			CL_ServerCommand(true, "specmode 4\n");
+ 		}
+ 
++		NanoLoadProbeReady();
+ 		Con_DPrintf( "client connected at %.2f sec\n", Platform_DoubleTime() - cls.timestart );
+ 
+ 		if( cl_autorecord.value && !cls.demoplayback )

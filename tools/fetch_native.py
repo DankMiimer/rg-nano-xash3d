@@ -5,7 +5,7 @@ import sys, shutil
 from fetch_sources import fetch, apply, apply_stack, run, ROOT
 base=Path(sys.argv[1]).resolve()
 engine=fetch('xash3d',base)
-for patch in ('renderer-nano.patch','renderer-nano-triangles.patch','engine-musl-timer.patch','engine-fbdev-nano.patch','engine-linux-entropy.patch','engine-evdev-time64.patch','engine-fbdev-log.patch','engine-alsa-ring.patch','engine-nano-hud.patch'):
+for patch in ('renderer-nano.patch','renderer-nano-triangles.patch','renderer-decal-bounds.patch','engine-musl-timer.patch','engine-fbdev-nano.patch','engine-linux-entropy.patch','engine-evdev-time64.patch','engine-fbdev-log.patch','engine-alsa-ring.patch','engine-nano-hud.patch'):
     apply(engine,patch)
 run('git','-C',str(engine),'submodule','update','--init','--recursive','--depth','1',
     '3rdparty/mainui','3rdparty/vgui_support','3rdparty/library_suffix',

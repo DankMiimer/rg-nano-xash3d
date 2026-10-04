@@ -50,6 +50,7 @@ if __name__ == '__main__':
     renderer=fetch('xash3d')
     apply(renderer, 'renderer-nano.patch')
     apply(renderer, 'renderer-nano-triangles.patch')
+    apply(renderer, 'renderer-decal-bounds.patch')
     client=fetch('cs16-client')
     apply(client, 'cs16-nano-4141.patch')
     apply(client, 'cs16-nano-spectator.patch')

@@ -100,7 +100,7 @@ def main():
         'runtime_root':a.device_root,
         'source_lock':json.loads((ROOT/'sources.lock.json').read_text()),
         'patches':{f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in (ROOT/'patches').glob('*.patch')},
-        'components':{str(f.relative_to(a.output)):hashlib.sha256(f.read_bytes()).hexdigest() for f in a.output.rglob('*') if is_elf(f)}}
+        'components':{f.relative_to(a.output).as_posix():hashlib.sha256(f.read_bytes()).hexdigest() for f in a.output.rglob('*') if is_elf(f)}}
     (a.output/'source-runtime.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print(f'Private native runtime assembled at {a.output}; no external OPK used.')
 

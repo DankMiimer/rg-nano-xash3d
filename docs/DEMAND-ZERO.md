@@ -37,4 +37,6 @@ Both processes ended by supervised request without a reported engine crash or fo
 
 ## Remaining measurements
 
-Use the same scenes and cache policy for repeated baseline/candidate comparisons before claiming faster loads or fewer gameplay faults. Compare transition/save timing and process RSS/faults, since `nano_mem` and peak payload counters deliberately report the same reserved capacity. Then investigate model animation/header storage and representative later Half-Life scenes. Keep the established controls, full-resolution HUD and save capacity intact.
+The subsequent [controlled comparison](LOAD-BENCHMARK.md) measures the same HL station save and CS map across twelve launches. Cache-cleared medians were lower with the change; warm ranges overlap, and whole-process RSS did not improve uniformly. The measured intervals exclude launcher startup and the first rendered frame. Keep these limits when interpreting the anonymous CSV.
+
+Later HL saves exposed a separate renderer lifecycle defect; [DECALS.md](DECALS.md) records the diagnosis, repair and bounded reload checks. Next investigate model animation/header and sound storage, and broaden save/transition coverage. Keep the established controls, full-resolution HUD and save capacity intact.

@@ -33,6 +33,8 @@ During repeated testing, the firmware's `amixer` command once blocked in uninter
 
 ## Repeat the measurements
 
+The subsequent [controlled load comparison](LOAD-BENCHMARK.md) separates cache-cleared and warm engine load intervals across twelve launches. It reports durations, faults and sampled memory, including overlapping warm ranges and cases where the candidate did not reduce RSS. [Later HL reload testing](DECALS.md) found and repaired stale decal surface heads in the software renderer.
+
 Profiling is off by default. Set `NANO_PROFILE=1` in the environment of a source launcher, or run `nano-run.sh` with that environment after stopping the frontend and arranging its restoration. Keep `NANO_DIAGNOSTIC=0` for comparable normal-game measurements. The legacy runtime has no frame profiler or Nano sleep implementation.
 
 `diagnostics/<game>/engine.log` emits one `nano-profile:` summary about every five seconds: client state, configured cap/VSync, frame count, FPS, median/p95/maximum interval, mean work time and frames over 50 ms. Statistics use wall time, including waits and stalls. Work time measures the engine frame body. The sample ring holds at most 512 intervals; if a window exceeds that, percentiles cover its most recent 512 intervals, while FPS, mean work, maximum and slow-frame count cover the whole window.

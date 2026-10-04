@@ -1,0 +1,65 @@
+--- a/ref/soft/r_surf.c
++++ b/ref/soft/r_surf.c
+@@ -924,7 +924,7 @@
+ 		unsigned int f, fstep;
+ 		int          skip;
+ 		pixel_t      *buffer;
+-		qboolean     transparent;
++		qboolean     transparent = false;
+ 		int          x, y, u, v, sv, w, h;
+ 		vec3_t       basis[3];
+ 
+@@ -950,6 +950,12 @@
+ 		if( w < 1 || h < 1 )
+ 			continue;
+ 
++		// Reject disjoint rectangles before clipping. In particular, a decal
++		// entirely above the surface must not wrap the unsigned row count.
++		if( x >= r_drawsurf.surfwidth || y >= r_drawsurf.surfheight
++		    || x <= -w || y <= -h )
++			continue;
++
+ 		if( x < 0 )
+ 		{
+ 			s1 += ( -x ) * ( s2 - s1 ) / w;
+@@ -976,7 +982,7 @@
+ 		if( t2 > tex->height )
+ 			t2 = tex->height;
+ 
+-		if( !tex->pixels[0] || s1 >= s2 || t1 >= t2 || !w )
++		if( !tex->pixels[0] || s1 >= s2 || t1 >= t2 || w <= 0 || h <= 0 )
+ 			continue;
+ 
+ 		if( tex->alpha_pixels )
+--- a/ref/soft/r_main.c
++++ b/ref/soft/r_main.c
+@@ -1220,6 +1220,21 @@
+ R_NewMap
+ ===============
+ */
++// A same-map reload can retain brush surfaces after the decal pool is reset.
++// Drop every model's surface heads so restored pool entries cannot self-link.
++static void R_ClearSurfaceDecals( void )
++{
++	for( int i = 1; i < gp_cl->nummodels; i++ )
++	{
++		model_t *model = CL_ModelHandle( i );
++		if( !model || model->type != mod_brush || model->name[0] == '*' )
++			continue;
++
++		for( int j = 0; j < model->numsurfaces; j++ )
++			model->surfaces[j].pdecals = NULL;
++	}
++}
++
+ void GAME_EXPORT R_NewMap( void )
+ {
+ 	model_t *world = WORLDMODEL;
+@@ -1232,6 +1247,7 @@
+ 	tr.draw_list->num_edge_entities = 0;
+ 
+ 	R_ClearDecals(); // clear all level decals
++	R_ClearSurfaceDecals();
+ 	R_StudioResetPlayerModels();
+ 
+ 	if( FBitSet( world->flags, MODEL_QBSP2 ))

@@ -111,6 +111,8 @@ python3 tests/test_supervisor.py
 # After build-native.sh (uses NANO_NATIVE_DIR if set):
 python3 tests/test_alsa_ring.py
 python3 tests/test_renderer_triangles.py
+python3 tests/test_renderer_decals.py
+python3 tests/test_renderer_decal_reload.py
 python3 tests/test_nano_menu.py
 python3 tests/test_nano_settings.py
 python3 tests/test_nano_options.py
@@ -124,6 +126,8 @@ python3 tests/test_nano_memory_peak.py
 python3 tests/test_nano_demand_zero.py
 python3 tests/test_nano_audio_start.py
 ```
+
+The [controlled load comparison](docs/LOAD-BENCHMARK.md) includes anonymous timing data and optional measurement patches. [Decal reload fixes](docs/DECALS.md) document the later Half-Life save-load defect and renderer regression checks.
 
 ## Check renderer clipping
 

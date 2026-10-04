@@ -1,0 +1,40 @@
+--- a/src/nano-supervise.c
++++ b/src/nano-supervise.c
+@@ -98,8 +98,8 @@
+         fclose(f);
+     }
+     snprintf(path, sizeof(path), "/proc/%d/status", pid);
+-    int n = snprintf(output, sizeof(output), "%lld,%d,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n",
+-        now_ms()-started, pid, read_key(path,"VmRSS:"), read_key("/proc/meminfo","MemAvailable:"),
++    int n = snprintf(output, sizeof(output), "%lld,%lld,%d,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n",
++        now_ms(), now_ms()-started, pid, read_key(path,"VmRSS:"), read_key("/proc/meminfo","MemAvailable:"),
+         read_key("/proc/meminfo","SwapFree:"), read_key("/proc/vmstat","pswpin"),
+         read_key("/proc/vmstat","pswpout"), minflt, majflt, utime, stime);
+     if (n > 0 && n < (int)sizeof(output)) write_log(log, output, (size_t)n);
+@@ -174,7 +174,7 @@
+         if(metrics.file) fclose(metrics.file);
+         close(sock); unlink(sockpath); return 2;
+     }
+-    const char *header="elapsed_ms,pid,rss_kb,available_kb,swap_free_kb,pswpin_pages,pswpout_pages,minflt,majflt,utime_ticks,stime_ticks\n";
++    const char *header="mono_ms,elapsed_ms,pid,rss_kb,available_kb,swap_free_kb,pswpin_pages,pswpout_pages,minflt,majflt,utime_ticks,stime_ticks\n";
+     write_log(&metrics,header,strlen(header));
+     struct sigaction action={0};
+     action.sa_handler=on_signal;
+@@ -203,7 +203,7 @@
+     fprintf(stderr,"supervisor: child=%d clock_ticks=%ld\n",pid,sysconf(_SC_CLK_TCK));
+     while(!ended || (!eof && now_ms()-ended_at<2000)) {
+         struct pollfd fds[2]={{eof ? -1 : pipes[0],POLLIN|POLLHUP,0},{sock,POLLIN,0}};
+-        poll(fds,2,200);
++        poll(fds,2,50);
+         char data[4096];
+         ssize_t n;
+         if(fds[1].revents&POLLIN) {
+@@ -227,7 +227,7 @@
+             if(n>0) { reported_signal=scan_reported_signal(crash_tail,data,(size_t)n,reported_signal); if(!log_failed && write_log(&engine,data,(size_t)n)) { log_failed=1; perror("engine log"); } }
+             else { if(n==0) eof=1; break; }
+         }
+-        if(!ended && now_ms()>=next_sample) { sample(&metrics,pid,started); next_sample=now_ms()+2000; }
++        if(!ended && now_ms()>=next_sample) { sample(&metrics,pid,started); next_sample=now_ms()+100; }
+         if(!ended && waitpid(pid,&status,WNOHANG)==pid) { ended=1; ended_at=now_ms(); }
+     }
+     char result[160];
