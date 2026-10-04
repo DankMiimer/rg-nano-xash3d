@@ -15,7 +15,7 @@ apply(engine/'3rdparty/mainui', 'mainui-nano-menu.patch')
 for header in ('nano-menu-options.h', 'nano-settings.h'):
     shutil.copy2(ROOT/'src'/header,engine/'3rdparty/mainui/menus'/header)
 apply(engine, 'engine-nano-profile.patch')
-apply_stack(engine, ('engine-nano-memory-report.patch', 'engine-nano-memory-peak.patch'))
+apply_stack(engine, ('engine-nano-memory-report.patch', 'engine-nano-memory-peak.patch', 'engine-nano-demand-zero.patch'))
 apply_stack(engine, ('renderer-nano-texture-memory.patch', 'renderer-nano-texture-share.patch'))
 shutil.copy2(ROOT/'src/nano-texture-share.h', engine/'ref/soft/nano-texture-share.h')
 shutil.copy2(ROOT/'src/nano-frame-stats.h', engine/'engine/common/nano-frame-stats.h')

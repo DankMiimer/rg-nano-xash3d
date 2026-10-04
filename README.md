@@ -103,7 +103,7 @@ At startup, the launcher reapplies saved system volume and enables the speaker a
 
 Diagnostics are under `diagnostics/valve` or `diagnostics/cstrike` inside the runtime. `engine.log` captures output, `metrics.csv` samples RAM/swap/page faults/CPU counters every two seconds, and `result.txt` records exit status, termination signals and crash signals printed by Xash's own handler (which can otherwise exit with code zero). Engine and metric logs keep two files of at most 512 KiB each. There is no automatic freeze detector; recovery is user-triggered.
 
-Source-built games also sleep between capped frames to reduce busy-waiting. Optional `NANO_PROFILE=1` reports frame timing without an on-screen overlay. See [performance measurements and remaining limits](docs/PERFORMANCE.md), the [longer hardware stability checks](docs/STABILITY.md) and [texture memory reductions](docs/MEMORY.md).
+Source-built games also sleep between capped frames to reduce busy-waiting. Optional `NANO_PROFILE=1` reports frame timing without an on-screen overlay. See [performance measurements and remaining limits](docs/PERFORMANCE.md), the [longer hardware stability checks](docs/STABILITY.md) and [texture memory reductions](docs/MEMORY.md) and [large cleared allocations](docs/DEMAND-ZERO.md).
 
 ```sh
 gcc -O2 -Wall -Wextra -Werror src/nano-supervise.c -o /var/tmp/rg-nano-supervise-host
@@ -121,6 +121,7 @@ gcc -std=c99 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined \
 build/tests/nano-texture-share
 python3 tests/test_nano_memory_report.py
 python3 tests/test_nano_memory_peak.py
+python3 tests/test_nano_demand_zero.py
 python3 tests/test_nano_audio_start.py
 ```
 

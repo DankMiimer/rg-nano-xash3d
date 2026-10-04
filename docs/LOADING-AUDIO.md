@@ -29,13 +29,13 @@ These are separate scene intervals, not equal-cache before/after trials. CS stil
 
 Actual-function sanitizer tests cover live/inactive pool seeding, transient allocations, growth/shrink, migration, disabled hooks, interval reset, 10,000 randomized accounting operations, 64-bit totals and bounded output. The existing snapshot report tests, ARM build and fresh/partial/full patch-stack reapplication checks pass.
 
-## Next optimization target
+## Next optimization target (implemented in the subsequent stage)
 
 The HL transition's 4,195,700-byte growth matches the 4 MiB save buffer plus its header in the pinned [save implementation](https://github.com/FWGS/xash3d-fwgs/blob/e3e459bb6735c9e6a6bf18658f637bc71cdc73df/engine/server/sv_save.c). The [pool allocator](https://github.com/FWGS/xash3d-fwgs/blob/e3e459bb6735c9e6a6bf18658f637bc71cdc73df/engine/common/zone.c) currently allocates and explicitly clears that entire buffer, touching pages even when the save uses only part of its capacity. This attribution is an inference from the measured delta and source.
 
 An isolated, dynamically linked on-device probe modeled the header, 4 MiB capacity and trailing sentinel. Across two fresh processes per method, malloc plus full memset incurred 1,029 minor faults and approximately 4.6 MiB RSS; calloc with only header/end touches incurred six minor faults and approximately 0.6 MiB RSS. First/last payload bytes were zero. This demonstrates a possible demand-zero mechanism in the firmware libc, not an engine performance improvement or a complete allocator regression check.
 
-Next test libc calloc for large cleared pool allocations while preserving save capacity, zero-initialization, sentinels, ownership and the custom-swap allocator path. Include dirty-block reuse, allocation failures, realloc/free and real save/load/landmark transitions before adoption. Follow with CS load/reload and later HL scenes using both pool peaks and RSS/page-fault timing. Do not shrink save capacity or reduce HUD/model quality to obtain a smaller number.
+The subsequent [demand-zero stage](DEMAND-ZERO.md) implements libc calloc for large cleared pool allocations, with full zero, sentinel, ownership and allocator-path checks plus bounded hardware saves/loads/transitions. The proposal at this measurement stage was to preserve save capacity, zero-initialization, sentinels, ownership and the custom-swap allocator path. Include dirty-block reuse, allocation failures, realloc/free and real save/load/landmark transitions before adoption. Follow with CS load/reload and later HL scenes using both pool peaks and RSS/page-fault timing. Do not shrink save capacity or reduce HUD/model quality to obtain a smaller number.
 
 ## Hardware checks and cleanup
 

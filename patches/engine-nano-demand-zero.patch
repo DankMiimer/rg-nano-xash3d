@@ -1,0 +1,29 @@
+--- a/engine/common/zone.c
++++ b/engine/common/zone.c
+@@ -331,7 +331,16 @@
+ 	else
+ 	{
+ 		size_t blocksize = sizeof( memheader_t ) + size + sizeof( byte );
+-		memheader_t *mem = Q_malloc( blocksize );
++#ifndef XASH_CUSTOM_SWAP
++        // Let libc retain demand-zero pages in large cleared allocations.
++        // The header and trailing sentinel are initialized below as before.
++        const qboolean zeroBlock = clear && size >= 256 * 1024;
++        memheader_t *mem = zeroBlock ? calloc( 1, blocksize ) : Q_malloc( blocksize );
++#else
++        // Custom swap storage must retain its own allocation/free pairing.
++        const qboolean zeroBlock = false;
++        memheader_t *mem = Q_malloc( blocksize );
++#endif
+ 
+ 		if( mem == NULL )
+ 		{
+@@ -343,7 +352,7 @@
+ 		Mem_PoolAdd( pool, size, blocksize );
+ 		Mem_PoolLinkAllocBig( pool, mem );
+ 
+-		if( clear )
++		if( clear && !zeroBlock )
+ 			memset((byte *)mem + sizeof( memheader_t ), 0, size );
+ 
+ 		return (byte *)mem + sizeof( memheader_t );
