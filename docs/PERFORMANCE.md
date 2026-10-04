@@ -29,7 +29,7 @@ The short runs reached approximately 40–43 MiB resident engine memory and 5–
 
 The subsequent [allocation investigation](MEMORY.md) found approximately 114 MiB of tracked CS payload, including 64 MiB in the renderer. Avoiding unused image/model mipmaps reduced that payload by about 10 MiB with base pixels preserved. Paging still occurs; separate short matches did not establish an FPS or loading-time improvement.
 
-During repeated testing, the firmware's `amixer` command once blocked in uninterruptible kernel sleep in `snd_soc_dapm_get_enum_double`, before engine startup. Restarting the Nano cleared it; later CS and HL launches succeeded. The root cause is unresolved. Userspace recovery cannot guarantee recovery from an audio-driver lockup.
+During repeated testing, the firmware's `amixer` command once blocked in uninterruptible kernel sleep in `snd_soc_dapm_get_enum_double`, before engine startup. Restarting the Nano cleared it; later CS and HL launches succeeded. The root cause is unresolved. [Targeted quiet speaker-volume restoration](LOADING-AUDIO.md) now avoids the broad mixer scan during built-in startup, with immediate HL sound confirmed by the user. Firmware volume shortcuts and USB output retain firmware commands. Userspace recovery cannot guarantee recovery from an audio-driver lockup.
 
 ## Repeat the measurements
 

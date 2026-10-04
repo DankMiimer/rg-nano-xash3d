@@ -36,6 +36,26 @@ load_keys() {
     sleep 0.3
     return "$KEY_STATUS"
 }
+restore_volume() {
+    case "$1" in ''|*[!0-9]*) return 1;; esac
+    [ "$1" -le 100 ] 2>/dev/null || return 1
+    if [ -f /mnt/FunKey/.asoundrc ]; then
+        # USB audio uses the firmware's separate card/volume policy.
+        volume set "$1"
+        return $?
+    fi
+    # Same rounded 16..63 mapping as the firmware, without simple-mixer
+    # enumeration of unrelated DAPM route controls. Quiet mode is essential:
+    # non-quiet cset loads the full high-level control list for its report.
+    AUDIO_PERCENT=$1
+    while [ "${AUDIO_PERCENT#0}" != "$AUDIO_PERCENT" ]; do
+        AUDIO_PERCENT=${AUDIO_PERCENT#0}
+    done
+    AUDIO_PERCENT=${AUDIO_PERCENT:-0}
+    AUDIO_RAW=$((16 + (AUDIO_PERCENT * 47 + 50) / 100))
+    amixer -c 0 -q cset "iface=MIXER,name='Headphone Playback Volume'" "$AUDIO_RAW" || return $?
+    amixer -c 0 -q cset "iface=MIXER,name='Headphone Playback Switch'" on,on
+}
 cleanup() {
     trap - EXIT HUP INT TERM
     if [ -n "$WATCH_PID" ] && kill -0 "$WATCH_PID" 2>/dev/null; then
@@ -67,7 +87,8 @@ if command -v audio_amp >/dev/null 2>&1; then
         NANO_VOLUME=$(volume get)
         case "$NANO_VOLUME" in ''|*[!0-9]*) ;; *)
             if [ "$NANO_VOLUME" -le 100 ]; then
-                volume set "$NANO_VOLUME" >> "$ROOT/$GAME-clock.log" 2>&1
+                restore_volume "$NANO_VOLUME" >> "$ROOT/$GAME-clock.log" 2>&1 ||
+                    echo "Audio volume restore incomplete; continuing with current mixer state" >> "$ROOT/$GAME-clock.log"
             fi;; esac
     fi
     audio_amp on >> "$ROOT/$GAME-clock.log" 2>&1

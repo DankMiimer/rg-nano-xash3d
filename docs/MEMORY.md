@@ -40,7 +40,7 @@ Half-Life also rendered the tram and station in short checks. A fresh station ca
 
 For a console-enabled diagnostic launch, issue `nano_mem` after the scene loads and collect its `nano-memory:` / `nano-memory-pool:` lines from `diagnostics/<game>/engine.log`, paired with `metrics.csv` and frame reports. Do not treat `memlist`-induced stalls as ordinary game performance. Logs remain private and may contain asset names.
 
-The next stage below shares duplicate immutable texture buffers. Remaining work includes transient loading allocations, model animation/header storage and later-campaign measurements. Preserve full-resolution HUD artwork and the existing controls. The firmware audio startup lock remains a separate unresolved issue.
+The next stage below shares duplicate immutable texture buffers. Remaining work includes transient loading allocations, model animation/header storage and later-campaign measurements. Preserve full-resolution HUD artwork and the existing controls. The later [loading/audio stage](LOADING-AUDIO.md) adds peak intervals and a targeted mixer startup workaround; the kernel driver cause remains unresolved.
 
 The changes extend the pinned [FWGS software texture implementation](https://github.com/FWGS/xash3d-fwgs/blob/e3e459bb6735c9e6a6bf18658f637bc71cdc73df/ref/soft/r_image.c) and retain its applicable license; no Valve assets or compiled runtime are included in the public project.
 

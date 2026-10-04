@@ -1,0 +1,101 @@
+--- a/engine/common/zone.c
++++ b/engine/common/zone.c
+@@ -98,6 +98,61 @@
+ static mempool_t *poolchain = NULL; // critical stuff
+ static size_t poolcount = 0;
+ 
++/* Nano peak interval: no allocation walks or output in allocation hooks. */
++typedef struct {
++    qboolean enabled;
++    uint64_t start, current, peak, largestGrowth, grows, shrinks;
++    char peakPool[64], largestPool[64];
++} nano_mem_peak_t;
++static nano_mem_peak_t nanoMemPeak;
++
++static inline void Mem_NanoGrowth( const mempool_t *pool, size_t bytes )
++{
++    if( !nanoMemPeak.enabled ) return;
++    nanoMemPeak.current += bytes;
++    nanoMemPeak.grows++;
++    if( nanoMemPeak.current > nanoMemPeak.peak )
++    {
++        nanoMemPeak.peak = nanoMemPeak.current;
++        Q_strncpy( nanoMemPeak.peakPool, pool->name, sizeof( nanoMemPeak.peakPool ));
++    }
++    if( bytes > nanoMemPeak.largestGrowth )
++    {
++        nanoMemPeak.largestGrowth = bytes;
++        Q_strncpy( nanoMemPeak.largestPool, pool->name, sizeof( nanoMemPeak.largestPool ));
++    }
++}
++
++static inline void Mem_NanoShrink( size_t bytes )
++{
++    if( !nanoMemPeak.enabled ) return;
++    nanoMemPeak.current -= bytes;
++    nanoMemPeak.shrinks++;
++}
++
++void Mem_NanoBegin_f( void )
++{
++    memset( &nanoMemPeak, 0, sizeof( nanoMemPeak ));
++    for( size_t i = 0; i < poolcount; i++ )
++        if( poolchain[i].filename ) nanoMemPeak.current += poolchain[i].totalsize;
++    nanoMemPeak.start = nanoMemPeak.peak = nanoMemPeak.current;
++    nanoMemPeak.enabled = true;
++    fprintf( stderr, "nano-memory-begin: bytes=%llu\n", (unsigned long long)nanoMemPeak.start );
++}
++
++void Mem_NanoEnd_f( void )
++{
++    const nano_mem_peak_t *p = &nanoMemPeak;
++    fprintf( stderr, "nano-memory-peak: tracking=%d start_bytes=%llu current_bytes=%llu peak_bytes=%llu largest_growth_bytes=%llu growth_events=%llu shrink_events=%llu\n",
++        p->enabled, (unsigned long long)p->start, (unsigned long long)p->current,
++        (unsigned long long)p->peak, (unsigned long long)p->largestGrowth,
++        (unsigned long long)p->grows, (unsigned long long)p->shrinks );
++    fprintf( stderr, "nano-memory-peak-pools: peak=%s largest_growth=%s\n", p->peakPool, p->largestPool );
++    nanoMemPeak.enabled = false;
++}
++/* End Nano peak interval. */
++
++
+ // a1ba: due to mempool being passed with the model through reused 32-bit field
+ // which makes engine incompatible with 64-bit pointers I changed mempool type
+ // from pointer to 32-bit handle, thankfully mempool structure is private
+@@ -125,12 +180,14 @@
+ static inline void Mem_PoolAdd( mempool_t *pool, size_t paysize, size_t blocksize )
+ {
+ 	pool->totalsize += paysize;
++	Mem_NanoGrowth( pool, paysize );
+ 	pool->realsize += blocksize;
+ }
+ 
+ static inline void Mem_PoolSubtract( mempool_t *pool, size_t paysize, size_t blocksize )
+ {
+ 	pool->totalsize -= paysize;
++	Mem_NanoShrink( paysize );
+ 	pool->realsize -= blocksize;
+ }
+ 
+--- a/engine/common/common.h
++++ b/engine/common/common.h
+@@ -381,6 +381,8 @@
+ void Mem_PrintStats( void );
+ void Mem_Stats_f( void );
+ void Mem_NanoReport_f( void );
++void Mem_NanoBegin_f( void );
++void Mem_NanoEnd_f( void );
+ 
+ #define Mem_Malloc( pool, size ) _Mem_Alloc( pool, size, false, __FILE__, __LINE__ )
+ #define Mem_Calloc( pool, size ) _Mem_Alloc( pool, size, true, __FILE__, __LINE__ )
+--- a/engine/common/host.c
++++ b/engine/common/host.c
+@@ -1136,6 +1136,8 @@
+ 
+ 	Cmd_AddCommand( "memlist", Mem_Stats_f, "prints memory pool information" );
+ 	Cmd_AddCommand( "nano_mem", Mem_NanoReport_f, "counter-only bounded memory snapshot" );
++	Cmd_AddCommand( "nano_mem_begin", Mem_NanoBegin_f, "begin opt-in tracked memory peak interval" );
++	Cmd_AddCommand( "nano_mem_end", Mem_NanoEnd_f, "report and stop tracked memory peak interval" );
+ 
+ #if !XASH_DEDICATED
+ 	Cmd_AddRestrictedCommand( "host_writeconfig", Host_WriteConfig, "save current configuration" );
