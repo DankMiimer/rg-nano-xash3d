@@ -103,7 +103,7 @@ At startup, the launcher reapplies saved system volume and enables the speaker a
 
 Diagnostics are under `diagnostics/valve` or `diagnostics/cstrike` inside the runtime. `engine.log` captures output, `metrics.csv` samples RAM/swap/page faults/CPU counters every two seconds, and `result.txt` records exit status, termination signals and crash signals printed by Xash's own handler (which can otherwise exit with code zero). Engine and metric logs keep two files of at most 512 KiB each. There is no automatic freeze detector; recovery is user-triggered.
 
-Source-built games also sleep between capped frames to reduce busy-waiting. Optional `NANO_PROFILE=1` reports frame timing without an on-screen overlay. See [performance measurements and remaining limits](docs/PERFORMANCE.md) and the [longer hardware stability checks](docs/STABILITY.md).
+Source-built games also sleep between capped frames to reduce busy-waiting. Optional `NANO_PROFILE=1` reports frame timing without an on-screen overlay. See [performance measurements and remaining limits](docs/PERFORMANCE.md), the [longer hardware stability checks](docs/STABILITY.md) and [texture memory reductions](docs/MEMORY.md).
 
 ```sh
 gcc -O2 -Wall -Wextra -Werror src/nano-supervise.c -o /var/tmp/rg-nano-supervise-host
@@ -116,6 +116,9 @@ python3 tests/test_nano_settings.py
 python3 tests/test_nano_options.py
 python3 tests/test_nano_frame_stats.py
 python3 tests/test_nano_texture_memory.py
+gcc -std=c99 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined \
+  -Isrc tests/test_nano_texture_share.c -o build/tests/nano-texture-share
+build/tests/nano-texture-share
 python3 tests/test_nano_memory_report.py
 ```
 
@@ -133,6 +136,6 @@ This exercises the actual renderer function with normal, fully off-screen, zero-
 
 ## License and credits
 
-Support tools and the menu integration in `src/nano-menu-options.h` are GPL-3.0-or-later; the small aiming/HUD, frame statistics and numeric settings helpers are MIT, as marked in each file. Existing upstream code, patches and components retain their applicable licenses and notices; see [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [SOURCES.md](SOURCES.md). The GPL grant for this repository does not license Valve game data, extracted artwork, third-party fonts, or binaries with unestablished corresponding source.
+Support tools and the menu integration in `src/nano-menu-options.h` are GPL-3.0-or-later; the small aiming/HUD, frame statistics, texture sharing and numeric settings helpers are MIT, as marked in each file. Existing upstream code, patches and components retain their applicable licenses and notices; see [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [SOURCES.md](SOURCES.md). The GPL grant for this repository does not license Valve game data, extracted artwork, third-party fonts, or binaries with unestablished corresponding source.
 
 Credits: Sn3zee-cmds/XASH3DFS; FWGS/Xash3D and its contributors; Velaron/CS16Client and its contributors; ReGameDLL_CS; FunKey-Project and firmware maintainers; and DankMiimer/NanoCraft for the clock helper. This is an independent project, unaffiliated with Valve or Anbernic.

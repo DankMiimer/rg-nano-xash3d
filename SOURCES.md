@@ -48,3 +48,5 @@ The Half-Life pin precedes the September 2026 freevgui SetPaintOffset extension,
 The bounded frame statistics helper records elapsed frame intervals and processing time through an opt-in engine hook. It does not copy an external profiler. Menu settings changes rearrange the existing controls and reuse their original callbacks and menu face.
 
 `src/nano-settings.h` is a newly written MIT helper for bounded numeric preferences and serialization. `src/nano-menu-options.h` integrates it with upstream menu controls under GPL-3.0-or-later. The settings UI uses existing sliders, checkboxes and artwork, with no copied external mod code or assets.
+
+`src/nano-texture-share.h` is a newly written MIT helper for sharing immutable byte-identical buffers with reference counting. Its software-renderer integration retains the upstream GPL license. It compares final converted pixels, including alpha storage, without importing an external texture-sharing implementation or publishing game images.

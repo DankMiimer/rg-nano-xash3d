@@ -36,6 +36,16 @@ def apply(target, filename):
     run('git', 'apply', '--check', str(patch), cwd=target)
     run('git', 'apply', str(patch), cwd=target)
 
+def apply_stack(target, filenames):
+    """Reapply overlapping dependent patches without resetting other edits."""
+    for filename in reversed(filenames):
+        patch = ROOT/'patches'/filename
+        applied = subprocess.run(['git', 'apply', '--reverse', '--check', str(patch)], cwd=target, capture_output=True)
+        if applied.returncode == 0:
+            run('git', 'apply', '--reverse', str(patch), cwd=target)
+    for filename in filenames:
+        apply(target, filename)
+
 if __name__ == '__main__':
     renderer=fetch('xash3d')
     apply(renderer, 'renderer-nano.patch')

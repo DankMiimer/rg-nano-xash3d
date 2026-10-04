@@ -1,0 +1,87 @@
+--- a/ref/soft/r_image.c
++++ b/ref/soft/r_image.c
+@@ -14,6 +14,30 @@
+ */
+ 
+ #include "r_local.h"
++#include "nano-texture-share.h"
++#include <stdio.h>
++
++static void *NanoTextureAlloc( size_t bytes )
++{
++    return Mem_Calloc( r_temppool, bytes );
++}
++
++static void NanoTextureFree( void *data )
++{
++    Mem_Free( data );
++}
++
++static NanoTextureShare nanoTextureShare = {
++    .alloc = NanoTextureAlloc, .free = NanoTextureFree
++};
++
++static void R_NanoTextureReport_f( void )
++{
++    const NanoTextureShare *s = &nanoTextureShare;
++    fprintf( stderr, "nano-textures: logical_bytes=%zu unique_bytes=%zu saved_bytes=%zu metadata_bytes=%zu buffers=%zu references=%zu\n",
++        s->logical_bytes, s->unique_bytes, s->logical_bytes - s->unique_bytes,
++        s->buffers * sizeof( NanoTextureBuffer ), s->buffers, s->references );
++}
+ 
+ #define TEXTURES_HASH_SIZE ( MAX_TEXTURES >> 2 )
+ 
+@@ -238,10 +262,10 @@
+ 	/* Reuploads must replace owned storage rather than lose its pointers. */
+ 	for( uint j = 0; j < 4; j++ )
+ 	{
+-		if( tex->pixels[j] ) Mem_Free( tex->pixels[j] );
++		NanoTextureRelease( &nanoTextureShare, tex->pixels[j] );
+ 		tex->pixels[j] = NULL;
+ 	}
+-	if( tex->alpha_pixels ) Mem_Free( tex->alpha_pixels );
++	NanoTextureRelease( &nanoTextureShare, tex->alpha_pixels );
+ 	tex->alpha_pixels = NULL;
+ 	tex->size = 0;
+ 	tex->numMips = 0;
+@@ -291,6 +315,11 @@
+ 
+ 		}
+ 
++		/* Publish only complete, immutable converted buffers. */
++		tex->pixels[j] = NanoTextureIntern( &nanoTextureShare, tex->pixels[j], texsize );
++		if( j == 0 && tex->alpha_pixels )
++			tex->alpha_pixels = NanoTextureIntern( &nanoTextureShare, tex->alpha_pixels, texsize );
++
+ 		if( j + 1 < (uint)mipCount )
+ 			GL_BuildMipMap( data, width, height, tex->depth, tex->flags );
+ 
+@@ -475,10 +504,8 @@
+ 		gEngfuncs.FS_FreeImage( tex->original );
+ 
+ 	for( int i = 0; i < 4; i++ )
+-		if( tex->pixels[i] )
+-			Mem_Free( tex->pixels[i] );
+-	if( tex->alpha_pixels )
+-		Mem_Free( tex->alpha_pixels );
++		NanoTextureRelease( &nanoTextureShare, tex->pixels[i] );
++	NanoTextureRelease( &nanoTextureShare, tex->alpha_pixels );
+ 
+ 	memset( tex, 0, sizeof( *tex ));
+ }
+@@ -878,6 +905,7 @@
+ 	// validate cvars
+ 
+ 	gEngfuncs.Cmd_AddCommand( "texturelist", R_TextureList_f, "display loaded textures list" );
++	gEngfuncs.Cmd_AddCommand( "nano_tex", R_NanoTextureReport_f, "shared texture storage counters" );
+ }
+ 
+ /*
+@@ -888,6 +916,7 @@
+ void R_ShutdownImages( void )
+ {
+ 	gEngfuncs.Cmd_RemoveCommand( "texturelist" );
++	gEngfuncs.Cmd_RemoveCommand( "nano_tex" );
+ 
+ 	image_t *tex;
+ 	int     i;

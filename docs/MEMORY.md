@@ -40,6 +40,29 @@ Half-Life also rendered the tram and station in short checks. A fresh station ca
 
 For a console-enabled diagnostic launch, issue `nano_mem` after the scene loads and collect its `nano-memory:` / `nano-memory-pool:` lines from `diagnostics/<game>/engine.log`, paired with `metrics.csv` and frame reports. Do not treat `memlist`-induced stalls as ordinary game performance. Logs remain private and may contain asset names.
 
-Next measure the remaining world/model/alpha texture storage, model source payload and transient loading allocations. Consider sharing duplicate immutable texture data or avoiding redundant source copies only after ownership and remapping are understood. Preserve full-resolution HUD artwork and the existing controls. The firmware audio startup lock remains a separate unresolved issue.
+The next stage below shares duplicate immutable texture buffers. Remaining work includes transient loading allocations, model animation/header storage and later-campaign measurements. Preserve full-resolution HUD artwork and the existing controls. The firmware audio startup lock remains a separate unresolved issue.
 
 The changes extend the pinned [FWGS software texture implementation](https://github.com/FWGS/xash3d-fwgs/blob/e3e459bb6735c9e6a6bf18658f637bc71cdc73df/ref/soft/r_image.c) and retain its applicable license; no Valve assets or compiled runtime are included in the public project.
+
+## Sharing identical pixels (2026-10-04)
+
+The low-memory engine already truncates studio model source data after texture upload; removing that copy again would not save memory. An offline scan instead found many repeated hand, glove and weapon skins under different model texture names. Its estimate was only a candidate count because palette/gamma/alpha processing can affect the final bytes.
+
+The renderer now shares completed byte-identical pixel buffers, including individual world mip levels and alpha buffers. FNV-1a hashes select candidates; matching size and a complete `memcmp` establish equality. Texture names, geometry, flags and retained source/remapping images remain independent. Updates release their old references, build fresh pixels and then share the resulting buffer if it matches another. Drawing only reads the buffers. A final reference release frees both the buffer and its registry node; color/alpha conversion and image dimensions are unchanged.
+
+`nano_tex` prints one counter record to the diagnostic log on request. It does not run automatically or add an overlay. The hash tables occupy 4 KiB of static storage on the Nano; node metadata is included in the renderer memory pool. Interning needs a temporary newly converted buffer and adds hashing/comparison work while uploading, rather than eliminating conversion or guaranteeing a smaller instantaneous loading peak.
+
+| CS de_dust snapshot | Tracked payload (MiB) | Renderer pool payload (MiB) |
+|---|---:|---:|
+| Mip reduction, before sharing | 104.20 | 54.33 |
+| Mip reduction plus sharing | 86.96 | 37.10 |
+
+The shared-buffer counters report 55,401,490 logical pixel bytes represented by 37,260,426 unique bytes: 18,141,064 bytes saved before 70,656 bytes of node metadata. The renderer payload reduction is exactly 18,070,408 bytes (17.23 MiB), plus the separate 4 KiB static table cost. Small differences elsewhere in total allocation reflect live game state. These are tracked allocations, not physical RAM; the process still needs paging. Compared with the original pre-mip snapshot, the two changes together remove roughly 27 MiB of tracked payload in this scene.
+
+The actual upload/deletion test compares output pixels with the pinned baseline, checks shared pixel/alpha identity, modifies one owner and verifies the other survives unchanged, then deletes owners in both orders. Generic ownership checks force every hash to collide, exercise differing contents/sizes, metadata allocation failure and 100 cycles of randomized ownership changes. Both pass AddressSanitizer/UndefinedBehaviorSanitizer. The ARM build, existing triangle/clipping checks and fresh/partial/full patch-stack reapplication checks pass; unrelated edits survive reapplication.
+
+The updated CS process ran for 419 seconds with a deliberate death/A press, a later respawn, weapon firing and two map reloads. After the first reload cached additional images, the second returned exactly the same logical/unique byte, buffer and reference counts. Fresh captures show the normal weapon/HUD, spectator view, respawn and team menu. Active/death timing windows were approximately 39.8 FPS at the saved 40 FPS limit. Reload windows still included 1.2–3.6 second stalls; this is no proof of an FPS or loading improvement over the previous build.
+
+Half-Life ran for 421 seconds through a natural tram transition, a station map, pistol firing and one verified temporary save/load. Opening-scene sharing saved 904,752 bytes before 30,168 bytes of node metadata (about 0.83 MiB net, excluding the static tables). Station and post-load windows stayed near the saved 30 FPS limit. An initial injected function-key attempt did not save or load because the backend lacks those mappings; only the subsequent mapped-key attempt, with a saved file and corresponding load log, counts as a save/load check. Fresh captures show the station pistol and HUD before and after that load. Physical-device audio was not reconfirmed during this stage; its code/settings were unchanged.
+
+Both processes exited by supervised request without a reported crash signal or forced KILL, returned to RetroFE and restored 1008 MHz after their 1200 MHz launches. All 28 ordinary HL save files were restored with matching hashes, both saved settings files were unchanged, cheats were reset and private test configuration/wrappers were removed. Installed native ELF hashes match the refreshed private manifest. These bounded checks do not establish full campaign or network-play reliability.
