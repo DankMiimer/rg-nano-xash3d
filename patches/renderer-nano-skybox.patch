@@ -1,0 +1,86 @@
+--- a/ref/soft/r_edge.c
++++ b/ref/soft/r_edge.c
+@@ -20,6 +20,7 @@
+ // r_edge.c
+ 
+ #include "r_local.h"
++#include "nano-skybox.h"
+ 
+ edge_t *auxedges;
+ edge_t *r_edges, *edge_p, *edge_max;
+@@ -820,6 +821,48 @@
+ The grey background filler seen when there is a hole in the map
+ ==============
+ */
++/* Sample the original cube only in visible BSP sky spans. No frame buffer
++ * clear, camera translation or additional texture copy is needed. */
++static void D_DrawSkySpans( espan_t *span )
++{
++	image_t *faces[SKYBOX_MAX_SIDES];
++	for( int i = 0; i < SKYBOX_MAX_SIDES; i++ )
++	{
++		int texture = tr.skyboxTextures[i];
++		faces[i] = texture > 0 && texture < MAX_TEXTURES ? R_GetTexture( texture ) : NULL;
++	}
++	for( ; span; span = span->pnext )
++	{
++		if( span->v < 0 || span->v >= vid.height )
++			continue;
++		int left = Q_max( 0, span->u );
++		int right = Q_min( vid.width, (int64_t)span->u + span->count );
++		float sx = (left - xcenter) * xscaleinv;
++		float sy = (span->v - ycenter) * yscaleinv;
++		pixel_t *dest = d_viewbuffer + span->v * r_screenwidth;
++		for( int x = left; x < right; x++, sx += xscaleinv )
++		{
++			int face;
++			float u, v;
++			float dx = RI.base_vpn[0] + sx * RI.base_vright[0] - sy * RI.base_vup[0];
++			float dy = RI.base_vpn[1] + sx * RI.base_vright[1] - sy * RI.base_vup[1];
++			float dz = RI.base_vpn[2] + sx * RI.base_vright[2] - sy * RI.base_vup[2];
++			pixel_t color = (int)sw_clearcolor.value & 0xFFFF;
++			if( NanoSkyboxFaceUV( dx, dy, dz, &face, &u, &v ))
++			{
++				image_t *image = faces[face];
++				if( image && image->width > 0 && image->height > 0 && image->pixels[0] )
++				{
++					int tx = bound( 0, (int)(u * image->width), image->width - 1 );
++					int ty = bound( 0, (int)(v * image->height), image->height - 1 );
++					color = image->pixels[0][ty * image->width + tx];
++				}
++			}
++			dest[x] = color;
++		}
++	}
++}
++
+ static void D_BackgroundSurf( surf_t *s )
+ {
+ // set up a gradient for the background surface that places it
+@@ -828,7 +871,10 @@
+ 	d_zistepv = 0;
+ 	d_ziorigin = -0.9;
+ 
+-	D_FlatFillSurface( s, (int)sw_clearcolor.value & 0xFFFF );
++	if( s->flags & SURF_DRAWSKY )
++		D_DrawSkySpans( s->spans );
++	else
++		D_FlatFillSurface( s, (int)sw_clearcolor.value & 0xFFFF );
+ 	D_DrawZSpans( s->spans );
+ }
+ 
+--- a/ref/soft/r_context.c
++++ b/ref/soft/r_context.c
+@@ -295,7 +295,11 @@
+ 
+ static void GAME_EXPORT R_SetupSky( int *skyboxTextures )
+ {
+-	// TODO: R_UnloadSkybox();
++	for( int i = 0; i < SKYBOX_MAX_SIDES; i++ )
++	{
++		GL_FreeTexture( tr.skyboxTextures[i] );
++		tr.skyboxTextures[i] = 0;
++	}
+ 	if( !skyboxTextures )
+ 		return;
+ 

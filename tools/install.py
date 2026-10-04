@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--serial', help='ADB serial when multiple devices are connected')
-    parser.add_argument('--native', action='store_true', help='Install separate experimental source entries')
+    parser.add_argument('--native', action='store_true', help='Install separate source-built entries')
     args = parser.parse_args()
     device_root='/mnt/FunKey/Xash3D-source' if args.native else '/mnt/FunKey/Xash3D'
     dist=ROOT/'build'/('native-dist' if args.native else 'dist')
@@ -24,7 +24,7 @@ if __name__ == '__main__':
         raise SystemExit(alive.stderr.strip())
     runtime = ROOT/'build'/('native-runtime' if args.native else 'runtime')
     if not (runtime/'engine/xash3d').is_file():
-        raise SystemExit('Run prepare_runtime.py first')
+        raise SystemExit('Run prepare_native.py first' if args.native else 'Run prepare_runtime.py first')
     run('shell', f'mkdir -p {device_root} "/mnt/Native games"')
     run('push', str(runtime)+ '/.', device_root+'/')
     label_suffix=suffix

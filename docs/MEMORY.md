@@ -8,7 +8,7 @@ The pinned software renderer generated four mip levels for every uploaded image.
 
 Texture reuploads previously overwrote owned pixel pointers and incremented size/mip counts without releasing the old buffers. They now free those buffers and replace their accounting. A retained source image is copied only when one does not already exist. The ownership regression test covers repeated content/size/alpha changes; these corrections do not establish that reuploads caused the earlier gameplay freezes.
 
-`nano_mem` adds a counter-only diagnostic command: one total record and at most sixteen largest nonempty pools. It does not walk allocation chains, check sentinels, allocate a report buffer or run automatically during gameplay. The older `memlist` integrity scan took several seconds in this swapped-out process and is unsuitable for frequent timing samples.
+`nano_mem` adds a counter-only diagnostic command: one total record, one asset-category record and at most sixteen largest nonempty pools. It does not walk allocation chains, check sentinels, allocate a report buffer or run automatically during gameplay. The older `memlist` integrity scan took several seconds in this swapped-out process and is unsuitable for frequent timing samples.
 
 ## Allocation measurements
 
@@ -66,3 +66,5 @@ The updated CS process ran for 419 seconds with a deliberate death/A press, a la
 Half-Life ran for 421 seconds through a natural tram transition, a station map, pistol firing and one verified temporary save/load. Opening-scene sharing saved 904,752 bytes before 30,168 bytes of node metadata (about 0.83 MiB net, excluding the static tables). Station and post-load windows stayed near the saved 30 FPS limit. An initial injected function-key attempt did not save or load because the backend lacks those mappings; only the subsequent mapped-key attempt, with a saved file and corresponding load log, counts as a save/load check. Fresh captures show the station pistol and HUD before and after that load. Physical-device audio was not reconfirmed during this stage; its code/settings were unchanged.
 
 Both processes exited by supervised request without a reported crash signal or forced KILL, returned to RetroFE and restored 1008 MHz after their 1200 MHz launches. All 28 ordinary HL save files were restored with matching hashes, both saved settings files were unchanged, cheats were reset and private test configuration/wrappers were removed. Installed native ELF hashes match the refreshed private manifest. These bounded checks do not establish full campaign or network-play reliability.
+
+The latest [model/sound measurements](MODEL-SOUND.md) split existing pool counters into asset categories. Player-model storage remains a larger candidate than the tested sound pool; no animation or sound-quality reduction has been adopted.

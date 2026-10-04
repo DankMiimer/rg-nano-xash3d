@@ -1,0 +1,47 @@
+--- a/engine/common/zone.c
++++ b/engine/common/zone.c
+@@ -761,6 +761,36 @@
+ */
+ 
+ /* Counter-only snapshot: no allocation-chain walks or integrity checks. */
++/* Opt-in pool-counter categories; player bytes are a subset of models.
++ * Do not inspect allocation chains, model headers or decoded sound buffers. */
++static void Mem_NanoAssets_f( void )
++{
++	unsigned long long models = 0, players = 0, sounds = 0, maps = 0, renderer = 0, other = 0;
++	size_t modelCount = 0, playerCount = 0;
++	for( size_t i = 0; i < poolcount; i++ )
++	{
++		const mempool_t *pool = &poolchain[i];
++		if( !pool->filename ) continue;
++		const char *name = pool->name;
++		if( name[0] == '^' && name[1] >= '0' && name[1] <= '9' ) name += 2;
++		if( !strncmp( name, "models/", 7 ))
++		{
++			models += pool->totalsize; modelCount++;
++			if( !strncmp( name, "models/player/", 14 ) ||
++			    !strncmp( name, "models/player.mdl", 17 ))
++			{
++				players += pool->totalsize; playerCount++;
++			}
++		}
++		else if( !strcmp( name, "SoundLib Pool" )) sounds += pool->totalsize;
++		else if( !strcmp( name, "ref_soft zone" )) renderer += pool->totalsize;
++		else if( !strncmp( name, "maps/", 5 )) maps += pool->totalsize;
++		else other += pool->totalsize;
++	}
++	fprintf( stderr, "nano-memory-assets: model_pools=%zu model_bytes=%llu player_pools=%zu player_model_bytes=%llu sound_pool_bytes=%llu map_pool_bytes=%llu renderer_pool_bytes=%llu other_pool_bytes=%llu\n",
++	    modelCount, models, playerCount, players, sounds, maps, renderer, other );
++}
++
+ void Mem_NanoReport_f( void )
+ {
+     size_t total = 0, real = 0, count = 0, emitted = 0;
+@@ -773,6 +803,7 @@
+         real += pool->realsize;
+     }
+     fprintf( stderr, "nano-memory: pools=%zu bytes=%zu allocated_bytes=%zu\n", count, total, real );
++    Mem_NanoAssets_f();
+     /* Print at most sixteen largest nonempty pools, stable by pool index. */
+     size_t previous = 0, previousSize = (size_t)-1;
+     qboolean havePrevious = false;

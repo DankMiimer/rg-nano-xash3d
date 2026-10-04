@@ -1,6 +1,8 @@
 # Where the files came from
 
-This documents the installation from which the support recipes were developed. Exact source commits and the base OPK digest are in [sources.lock.json](sources.lock.json).
+The current framebuffer ports independently build the engine, renderer, filesystem, menus and HL/CS libraries from pinned public source. They do not consume the XASH3DFS package. Source pins and the historic base-package digest are in [sources.lock.json](sources.lock.json). Rendering, controls, immediate audio, saves/loads, bounded transitions and original CS sky rendering have passed the checks described in [VALIDATION.md](docs/VALIDATION.md). Game data remain user-supplied.
+
+The table below records the original legacy installation; the [independent native recipe](#independent-native-recipe) describes the current ports.
 
 | Component in the installation | Origin | What this repository publishes |
 |---|---|---|
@@ -21,7 +23,7 @@ This documents the installation from which the support recipes were developed. E
 
 At the time of preparation, the XASH3DFS repository exposes a README, packaged OPK and icon, rather than the corresponding Nano port source. The upstream FWGS revision supplies the renderer source used here, but does not establish that it is complete corresponding source for the modified Nano engine or the supplied Half-Life libraries.
 
-Accordingly, this repository is openly licensed **support code and patches**. It does not claim to relicense the entire installed runtime. Third-party compiled runtime libraries and game assets are excluded from Git and from repository releases. The legacy assembly still has that limitation. The separate native recipe reconstructs the hardware support from upstream source and small published patches; compilation has passed, while device parity must be established before adopting it.
+Accordingly, this repository is openly licensed **support code and patches**. It does not claim to relicense the entire installed runtime. Third-party compiled runtime libraries and game assets are excluded from Git and from repository releases. The legacy assembly still has that limitation. The separate native recipe reconstructs the hardware support from upstream source and small published patches; hardware checks now cover rendering, controls, audio and bounded gameplay. Extended campaign and network coverage remain incomplete.
 
 The assembly recipe patches two exact binary strings locally: `/dev/random` becomes a launcher-created `/tmp/xash-r` symlink to `/dev/urandom`, and the private Nano SDL's `/dev/dsp` device name becomes ALSA `default`. It deliberately rejects unexpected input strings rather than guessing offsets.
 
@@ -50,3 +52,5 @@ The bounded frame statistics helper records elapsed frame intervals and processi
 `src/nano-settings.h` is a newly written MIT helper for bounded numeric preferences and serialization. `src/nano-menu-options.h` integrates it with upstream menu controls under GPL-3.0-or-later. The settings UI uses existing sliders, checkboxes and artwork, with no copied external mod code or assets.
 
 `src/nano-texture-share.h` is a newly written MIT helper for sharing immutable byte-identical buffers with reference counting. Its software-renderer integration retains the upstream GPL license. It compares final converted pixels, including alpha storage, without importing an external texture-sharing implementation or publishing game images.
+
+`src/nano-skybox.h` is a newly written MIT cube-projection helper matching the pinned engine's original sky orientation. The software renderer samples user-supplied sky textures already loaded by the engine; no replacement sky artwork or external mod implementation was copied.

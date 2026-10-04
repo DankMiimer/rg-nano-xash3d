@@ -51,6 +51,8 @@ if __name__ == '__main__':
     apply(renderer, 'renderer-nano.patch')
     apply(renderer, 'renderer-nano-triangles.patch')
     apply(renderer, 'renderer-decal-bounds.patch')
+    apply(renderer, 'renderer-nano-skybox.patch')
+    shutil.copy2(ROOT/'src/nano-skybox.h', renderer/'ref/soft/nano-skybox.h')
     client=fetch('cs16-client')
     apply(client, 'cs16-nano-4141.patch')
     apply(client, 'cs16-nano-spectator.patch')
