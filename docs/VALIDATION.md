@@ -10,7 +10,8 @@ Checks were performed on an RG Nano with 56,164 KiB total RAM, SD-backed swap an
 - **Counter-Strike `listenserver.cfg`:** a Steam copy placed over ours was moved to `listenserver.cfg.steam` and replaced at launch.
 - **Counter-Strike bots without Condition Zero files:** the filtered `extras.pk3` (only `userconfig.d`) and the original `BotProfile.db` were used, with no `BotChatter.db` or voice files. Two Easy bots joined de_dust (NAV present), the round started ("Game Commencing!") and play continued for 40 s.
 - **Controls configs:** the generated `nano-controls.cfg` files are byte-identical to the approved UI profile 3 files on the device.
-- **Not yet tested:** a FunKey S, and the RG Nano's real power-off and cold boot into the resumed game.
+- **Real power-off (RG Nano):** the owner started Half-Life from the upgraded Native games entry and pressed the power button in game. The console showed *SAVING…* and switched off. After power-on it went straight back into the game. Afterwards `nano_poweroff.sav` and its preview carried the power-off time, `/mnt/instant_play` had been consumed at boot, and FunKey OS had recorded the resumed launcher's PID.
+- **Not yet tested:** a FunKey S.
 
 ## Established SDL ports
 
