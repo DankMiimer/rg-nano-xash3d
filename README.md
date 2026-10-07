@@ -81,7 +81,7 @@ Repeat install step 3 with the new release. Your saves and settings are kept.
 
 ## Uninstalling
 
-Delete `Native games\Half-Life.opk`, `Native games\Counter-Strike.opk` and the `FunKey\Xash3D-source` folder (this also deletes your saves).
+Delete `Half-Life.opk`, `Half-Life.png`, `Counter-Strike.opk` and `Counter-Strike.png` from `Native games`, and the `FunKey\Xash3D-source` folder (this also deletes your saves).
 
 ## Troubleshooting
 
@@ -112,7 +112,7 @@ Release testing covered the RG Nano. A FunKey S has not been tested yet; reports
 
 ### Release contents
 
-The release zip contains the engine, the game libraries (built from the GPL and Valve SDK sources above), the launchers and a free Tahoma-compatible menu font from Wine. It contains **no Valve game data or artwork**:
+The release zip contains the engine, the game libraries (built from the GPL and Valve SDK sources above), the launchers and a free Tahoma-compatible menu font from Wine. It contains **no files from Half-Life, Counter-Strike or Condition Zero**:
 
 - The menu backgrounds and logos, and the launcher icons, are built on the console at first launch from the player's own files by `nano-art` ([src/nano-art.c](src/nano-art.c)). It gives the same result as the PC script `tools/prepare_menu_art.py`.
 - The optional Valve intro needs `tools/prepare_intro.py` and FFmpeg on a PC. See [menu appearance](docs/NANO-UI-VISUAL.md).
