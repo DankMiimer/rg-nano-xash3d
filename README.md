@@ -147,4 +147,6 @@ Nano tools and menu integration are GPL-3.0-or-later; small helpers are MIT, as 
 
 Thanks to FWGS and the Xash3D and HLSDK Portable contributors, Velaron (CS16Client), the ReGameDLL_CS authors, the FunKey project and DrUm78 for FunKey OS, Sn3zee-cmds for the XASH3DFS port that started this work, and reno for his FunKey ports.
 
+This project was made with the help of LLM coding assistants (OpenAI Codex and Anthropic's Claude). They wrote much of the code, patches, tools and documentation, under my direction and with testing on real hardware.
+
 This is an unofficial fan project, not affiliated with Valve, Anbernic or the FunKey project. Half-Life and Counter-Strike are trademarks of Valve Corporation.
