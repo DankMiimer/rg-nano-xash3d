@@ -13,6 +13,11 @@ from prepare_native import is_elf, needed  # noqa: E402
 from prepare_runtime import ROOT, LOCK, copy  # noqa: E402
 
 DEVICE_ROOT = '/mnt/FunKey/Xash3D-source'
+# CS16Client's extras.pk3 also carries unlicensed Condition Zero/Valve material: bot
+# voices and profiles, training maps and sounds, menu bitmaps and sounds. Releases keep
+# only its default config files and add an original BotProfile.db (assets/cstrike).
+# Touch support is unused on these consoles. FWGS's engine extras ship unchanged.
+CS_EXTRAS_KEEP = ('userconfig.d/',)
 # Never shipped: Valve game data and artwork, or anything a player's install adds later.
 FORBIDDEN_SUFFIXES = {'.wad', '.bsp', '.mdl', '.spr', '.tga', '.bmp', '.ico', '.wav', '.mp3', '.avi', '.webm', '.nav',
                       '.sav', '.gam', '.nvi', '.dll', '.exe'}
@@ -69,8 +74,16 @@ def main():
     copy(engine/'valve/extras.pk3', rt/'valve/extras.pk3')
     for rel in ('valve/cl_dlls/client_armv7hf.so', 'valve/dlls/hl_armv7hf.so'):
         copy(hl/rel, rt/rel)
-    for rel in ('cl_dlls/client_armv7hf.so', 'cl_dlls/menu_armv7hf.so', 'dlls/cs_armv7hf.so', 'extras.pk3'):
+    for rel in ('cl_dlls/client_armv7hf.so', 'cl_dlls/menu_armv7hf.so', 'dlls/cs_armv7hf.so'):
         copy(cs/rel, rt/'cstrike'/rel)
+    with zipfile.ZipFile(cs/'extras.pk3') as source, zipfile.ZipFile(rt/'cstrike/extras.pk3', 'w') as target:
+        for info in sorted(source.infolist(), key=lambda i: i.filename):
+            if info.is_dir() or not info.filename.startswith(CS_EXTRAS_KEEP):
+                continue
+            entry = zipfile.ZipInfo(info.filename, date_time=(2026, 1, 1, 0, 0, 0))
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            target.writestr(entry, source.read(info))
+    copy(ROOT/'assets/cstrike/BotProfile.db', rt/'cstrike/BotProfile.db')
     for tool in ('nano-clk-arm', 'seed-rng-arm', 'nano-supervise-arm', 'nano-art-arm'):
         copy(ROOT/'build/bin'/tool, rt/tool)
     copy(ROOT/'tools/nano-run.sh', rt/'nano-run.sh')
@@ -155,6 +168,10 @@ def main():
             raise SystemExit(f'Unexpected font {rel}')
         if any(token in f.read_bytes() for token in private):
             raise SystemExit(f'{rel} contains the builder\'s user name or home path; build outside the home folder')
+    with zipfile.ZipFile(rt/'cstrike/extras.pk3') as extras:
+        stray = [n for n in extras.namelist() if not n.startswith(CS_EXTRAS_KEEP)]
+        if stray or not extras.namelist():
+            raise SystemExit(f'Unexpected cstrike/extras.pk3 contents: {stray[:5]}')
     archive = a.output/f'{name}.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for f in files:

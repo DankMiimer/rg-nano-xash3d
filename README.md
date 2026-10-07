@@ -71,7 +71,7 @@ Prefer aiming with the face buttons? Turn on **Face-button aiming** under *Nano 
 
 - **Closing the lid saves.** Closing the FunKey S lid, or pressing the RG Nano power button, saves Half-Life and switches the console off. Turn it on again and you continue where you left off. Counter-Strike just closes.
 - **Saves:** in Half-Life, *Menu → Save/Load Game* shows three saves at a time with pictures (**A** load, **X** save, **Y** delete).
-- **Counter-Strike** starts with an offline match setup: choose the map, the number of bots (0–7) and the difficulty. Bots need a navigation file for each map, which a new install doesn't have yet. If you see *No NAV: bots 0 or Advanced*, either play with 0 bots, or open *Advanced*, tick *Allow slow NAV analysis* and start. The console then spends a few minutes (once per map) mapping it for the bots.
+- **Counter-Strike** starts with an offline match setup: choose the map, the number of bots (0–7) and the difficulty. Bots need a navigation file for each map, which a new install doesn't have yet. If you see *No NAV: bots 0 or Advanced*, either play with 0 bots, or open *Advanced*, tick *Allow slow NAV analysis* and start. The console then spends a few minutes (once per map) mapping it for the bots. Bots fight normally but don't use voice chatter.
 - **Settings** for frame rate, aiming and HUD size are under *Nano settings* in each game's options.
 - **Performance:** both games are capped at 30 FPS by default and held that in the tested scenes. Busy scenes can drop below it, and there are pauses while levels load: these consoles only have 64 MB of RAM.
 
@@ -117,6 +117,7 @@ The release zip contains the engine, the game libraries (built from the GPL and 
 - The menu backgrounds and logos, and the launcher icons, are built on the console at first launch from the player's own files by `nano-art` ([src/nano-art.c](src/nano-art.c)). It gives the same result as the PC script `tools/prepare_menu_art.py`.
 - The optional Valve intro needs `tools/prepare_intro.py` and FFmpeg on a PC. See [menu appearance](docs/NANO-UI-VISUAL.md).
 - Bot navigation files are generated on the console the first time a map is played with bots.
+- Counter-Strike bots use our own [bot profiles](assets/cstrike/BotProfile.db). CS16Client's extra package also carries Condition Zero bot voices, training maps and menu files; the release leaves those out, so bots don't use voice chatter. The engine's own FWGS `extras.pk3` ships unchanged.
 
 ### Building from source
 

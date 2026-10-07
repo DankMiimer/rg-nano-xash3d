@@ -54,6 +54,9 @@ The Half-Life pin precedes the September 2026 freevgui SetPaintOffset extension,
 | Menu font | Wine's Tahoma at `wine-10.0`, pinned by SHA-256 in `sources.lock.json`; its `.sfd` source and LGPL/Bitstream Vera licences ship in the zip |
 | Launcher icons | Plain placeholder drawn by `tools/make_icons.py`; replaced on the console by the icon in the player's own `game.ico` |
 | Menu artwork | Not shipped. Built on the console at first launch from the player's own files by `src/nano-art.c`; output matches `tools/prepare_menu_art.py` byte for byte |
+| Engine `extras.pk3` | FWGS/xash-extras as built by the engine, unchanged |
+| Counter-Strike `extras.pk3` | Only `userconfig.d/` from CS16Client's `cs16client-extras`; its Condition Zero bot voices, bot/chatter databases, training maps and sounds, menu bitmaps and sounds are dropped |
+| Counter-Strike `BotProfile.db` | Original bot names and personalities, `assets/cstrike/BotProfile.db` |
 | Valve intro, NAV files, game data, saves, RNG seed | Not shipped |
 
 The packager refuses to finish if the zip contains game-data file types, a font other than the pinned one, or the builder's user name or home path.

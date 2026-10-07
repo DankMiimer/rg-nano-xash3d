@@ -77,6 +77,7 @@ GOOD TO KNOW
   install doesn't have. If you see "No NAV: bots 0 or Advanced", play with
   0 bots, or open Advanced, tick "Allow slow NAV analysis" and start: the
   console then spends a few minutes (once per map) mapping it for bots.
+  Bots fight normally but don't use voice chatter.
 - Expect some pauses while levels load: the console has only 64 MB of RAM.
 - Settings for frame rate, aiming and HUD size: Menu > Configuration >
   Nano settings (Counter-Strike: Menu > Options > Nano settings).

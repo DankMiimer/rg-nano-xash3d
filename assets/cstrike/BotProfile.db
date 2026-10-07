@@ -1,0 +1,199 @@
+//----------------------------------------------------------------------------
+// BotProfile.db for the RG Nano / FunKey S release of Counter-Strike
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Original bot names and personalities written for this port, in the format
+// ReGameDLL_CS reads. Each difficulty has eight bots, so the offline match
+// setup's maximum of seven always finds free profiles. Feel free to edit.
+//----------------------------------------------------------------------------
+
+// Every profile starts from these values.
+Default
+	Skill = 50
+	Aggression = 50
+	ReactionTime = 0.3
+	AttackDelay = 0
+	Teamwork = 75
+	WeaponPreference = none
+	Cost = 0
+	Difficulty = NORMAL
+	VoicePitch = 100
+	Skin = 0
+End
+
+//----------------------------------------------------------------------------
+// Difficulty templates
+//----------------------------------------------------------------------------
+
+Template Easy
+	Skill = 15
+	Aggression = 30
+	ReactionTime = 0.6
+	AttackDelay = 0.5
+	Teamwork = 50
+	Difficulty = EASY
+End
+
+Template Normal
+	Skill = 45
+	Aggression = 50
+	ReactionTime = 0.4
+	AttackDelay = 0.25
+	Teamwork = 70
+	Difficulty = NORMAL
+End
+
+Template Hard
+	Skill = 75
+	Aggression = 70
+	ReactionTime = 0.3
+	AttackDelay = 0.1
+	Teamwork = 85
+	Difficulty = HARD
+End
+
+Template Expert
+	Skill = 100
+	Aggression = 85
+	ReactionTime = 0.2
+	AttackDelay = 0
+	Teamwork = 100
+	Difficulty = EXPERT
+End
+
+//----------------------------------------------------------------------------
+// Weapon styles
+//----------------------------------------------------------------------------
+
+Template Rifle
+	WeaponPreference = m4a1
+	WeaponPreference = ak47
+	WeaponPreference = famas
+	WeaponPreference = galil
+End
+
+Template Sniper
+	WeaponPreference = awp
+	WeaponPreference = scout
+	WeaponPreference = m4a1
+	WeaponPreference = ak47
+End
+
+Template Close
+	WeaponPreference = mp5
+	WeaponPreference = p90
+	WeaponPreference = m3
+	WeaponPreference = ump45
+End
+
+//----------------------------------------------------------------------------
+// Easy
+//----------------------------------------------------------------------------
+
+Easy Pebble
+End
+
+Easy Biscuit
+End
+
+Easy+Close Noodle
+End
+
+Easy Pickle
+End
+
+Easy+Rifle Muffin
+End
+
+Easy Sprout
+End
+
+Easy+Close Waffle
+End
+
+Easy Button
+End
+
+//----------------------------------------------------------------------------
+// Normal
+//----------------------------------------------------------------------------
+
+Normal+Rifle Falcon
+End
+
+Normal Juniper
+End
+
+Normal+Close Comet
+End
+
+Normal+Rifle Tundra
+End
+
+Normal Cobalt
+End
+
+Normal+Sniper Ember
+End
+
+Normal+Close Granite
+End
+
+Normal Willow
+End
+
+//----------------------------------------------------------------------------
+// Hard
+//----------------------------------------------------------------------------
+
+Hard+Rifle Viper
+End
+
+Hard+Sniper Raptor
+End
+
+Hard Onyx
+End
+
+Hard+Rifle Talon
+End
+
+Hard+Close Blaze
+End
+
+Hard Havoc
+End
+
+Hard+Rifle Specter
+End
+
+Hard+Close Rook
+End
+
+//----------------------------------------------------------------------------
+// Expert
+//----------------------------------------------------------------------------
+
+Expert+Rifle Zenith
+End
+
+Expert+Sniper Apex
+End
+
+Expert+Rifle Nova
+End
+
+Expert Titan
+End
+
+Expert+Close Vortex
+End
+
+Expert+Rifle Phantom
+End
+
+Expert+Sniper Cipher
+End
+
+Expert Sentinel
+End
