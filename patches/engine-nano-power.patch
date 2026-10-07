@@ -1,0 +1,117 @@
+--- a/engine/platform/platform.h
++++ b/engine/platform/platform.h
+@@ -68,6 +68,10 @@
+ #if XASH_POSIX
+ void Posix_Daemonize( void );
+ void Posix_SetupSigtermHandling( void );
++#include <signal.h>
++// Set by SIGUSR1: FunKey OS asks the running game to save before it powers off.
++extern volatile sig_atomic_t nano_power_request;
++void Posix_SetupNanoPowerHandling( void );
+ char *Posix_Input( void );
+ // returns the number of stable network device MAC addresses, each packed into low 48 bits
+ int Posix_GetNetDeviceAddresses( uint64_t *addresses, int max );
+--- a/engine/platform/posix/sys_posix.c
++++ b/engine/platform/posix/sys_posix.c
+@@ -86,6 +86,25 @@
+ 
+ }
+ 
++volatile sig_atomic_t nano_power_request;
++
++static void Posix_NanoPowerCallback( int signal )
++{
++	if( !nano_power_request )
++		nano_power_request = 1;
++}
++
++// The client build installs no signal handlers of its own, so without this
++// SIGUSR1 would simply kill the game. Restart interrupted calls (audio, files).
++void Posix_SetupNanoPowerHandling( void )
++{
++	struct sigaction act = { 0 };
++	act.sa_handler = Posix_NanoPowerCallback;
++	sigemptyset( &act.sa_mask );
++	act.sa_flags = SA_RESTART;
++	sigaction( SIGUSR1, &act, NULL );
++}
++
+ static void Posix_SigtermCallback( int signal )
+ {
+ 	string reason;
+--- a/engine/common/host.c
++++ b/engine/common/host.c
+@@ -653,6 +653,52 @@
+ 	return true;
+ }
+ 
++#if XASH_POSIX && !XASH_DEDICATED
++/*
++=================
++Host_NanoPowerFrame
++
++FunKey OS sends SIGUSR1 when the console powers off (FunKey S lid, RG Nano
++power button). Save single-player progress for the launcher to resume, let
++the save preview render, then quit normally so settings are written too.
++=================
++*/
++static void Host_NanoPowerFrame( void )
++{
++	static int frames;
++	static double started;
++
++	if( nano_power_request == 1 )
++	{
++		const char *flag = getenv( "NANO_POWER_FLAG" );
++
++		nano_power_request = 2;
++		frames = 0;
++		started = Platform_DoubleTime();
++		Con_Printf( "nano-power: power-off requested\n" );
++
++		if( SV_Active() && SV_SaveGame( "nano_poweroff" ))
++		{
++			Con_Printf( "nano-power: saved nano_poweroff\n" );
++			if( !COM_StringEmptyOrNULL( flag ))
++			{
++				FILE *f = fopen( flag, "w" );
++				if( f ) fclose( f );
++			}
++			return;
++		}
++
++		nano_power_request = 3;
++		Cbuf_AddText( "quit\n" );
++	}
++	else if( nano_power_request == 2 && ++frames >= 4 && Platform_DoubleTime() - started >= 0.25 )
++	{
++		nano_power_request = 3;
++		Cbuf_AddText( "quit\n" );
++	}
++}
++#endif
++
+ /*
+ =================
+ Host_Frame
+@@ -663,6 +709,10 @@
+ 	// decide the simulation time
+ 	if( !Host_FilterTime( time ))
+ 		return;
++
++#if XASH_POSIX && !XASH_DEDICATED
++	Host_NanoPowerFrame();
++#endif
+ 
+ 	double t1 = Platform_DoubleTime();
+ 
+@@ -1117,6 +1167,9 @@
+ 
+ #if XASH_DEDICATED
+ 	Platform_SetupSigtermHandling();
++#endif
++#if XASH_POSIX && !XASH_DEDICATED
++	Posix_SetupNanoPowerHandling();
+ #endif
+ 	Platform_Init( Host_IsDedicated( ) || developer >= DEV_EXTENDED );
+ 	FS_Init();

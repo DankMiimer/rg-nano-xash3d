@@ -79,7 +79,17 @@ Clipping checks generate a C harness; compile and run it with AddressSanitizer/U
 
 For hardware comparisons, isolate one game with writable `/tmp` roots and read-only SD assets. Capture matching saved HL states and CS HUD-message fixtures at native size and 4x nearest-neighbour zoom. Exercise video preview rows, focus scrolling, save/load lists, fields, table columns, Cancel-default confirmations, team/buy selection, all spectator modes and both held/menu-opened scoreboard paging. Verify the original and candidate opacity ramps through actual menu rendering. Test viewer RGB565 orientation against fbgrab, partial-frame handling, helper-loss fallback/reconnect, freeze/resume and owned cleanup; benchmark capture disabled and at 2/5/10 fps. Consult [UI validation limits](NANO-UI-V2.md) before interpreting screenshots as physical-display evidence.
 
-To check actual stb glyph bounds using a legally available local copy of the installed menu font, set `NANO_MENU_FONT=/path/to/FiraSans-Regular.ttf` and run `python3 tests/test_nano_font_metrics.py` with `NANO_NATIVE_DIR` as above. No game fonts are included in the source repository.
+To check actual stb glyph bounds using a legally available local copy of the installed menu font, set `NANO_MENU_FONT=/path/to/FiraSans-Regular.ttf` and run `python3 tests/test_nano_font_metrics.py` with `NANO_NATIVE_DIR` as above. No game fonts are included in the source repository. For the release font, point `NANO_MENU_FONT` at the cached Wine Tahoma in `build/release/cache/`. Its cap heights and cells match Microsoft's Tahoma at 12, 14 and 26 px; only `|` sits one pixel lower, which the test allows.
+
+## Release tools
+
+```sh
+python3 tests/test_nano_art.py
+```
+
+This builds `src/nano-art.c` with AddressSanitizer/UndefinedBehaviorSanitizer. It runs the tool and `tools/prepare_menu_art.py` on synthetic game files (RLE and plain TGA, partial tiles, both row orders) and requires byte-identical backgrounds and logos, plus a sprite above 30 dB. Missing and damaged sources must be handled. For launcher icons it builds BMP-style `game.ico` files like Steam's, compares the decoded icon with Pillow's choice, and checks that it is written once into an uncompressed `mksquashfs` OPK and its box-art PNG. Compressed OPKs, other games' OPKs and player-supplied box art must stay untouched.
+
+`nano-art` calls no libm function. FunKey OS's musl libm (SDK and firmware) returns `ceil(7.5) == 7.5`, `rint`/`floor`/`round` likewise, and `sin(9) == 1`. On the device that made the first build overflow a buffer.
 
 `python3 tests/test_nano_intro.py` executes the bounded player and actual cinematic
 transitions with sanitizers. Set `NANO_INTRO_FILE=/path/to/nano_valve.nvi` to also

@@ -25,7 +25,7 @@ permits it; device clarity and performance determine whether that path is usable
 
 ## Preparing owned artwork
 
-Install Pillow for the asset preparation step, then run:
+Release builds do this on the console: at first launch `nano-art` (`src/nano-art.c`) builds the same five files from the player's own game data, byte for byte. For a private assembly on a PC, install Pillow, then run:
 
 ```sh
 python3 tools/prepare_menu_art.py --games /path/to/game-data --output build/menu-art

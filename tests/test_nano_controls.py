@@ -154,7 +154,8 @@ int main(){
 }
 '''
 # Resolve every generated bind through the engine's actual key-name parser.
-subprocess.run(['python3',str(r/'tools/package_launchers.py'),'--native'],check=True,stdout=subprocess.DEVNULL)
+subprocess.run(['python3',str(r/'tools/make_icons.py'),str(r/'build/test-icons')],check=True,stdout=subprocess.DEVNULL)
+subprocess.run(['python3',str(r/'tools/package_launchers.py'),'--native','--icons',str(r/'build/test-icons')],check=True,stdout=subprocess.DEVNULL)
 import re
 checks=[]
 for game in ('valve','cstrike'):

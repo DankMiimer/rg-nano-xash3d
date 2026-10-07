@@ -4,13 +4,16 @@ import argparse, shutil, tarfile, re
 parser=argparse.ArgumentParser()
 parser.add_argument("--native",action="store_true")
 parser.add_argument("--runtime-root")
+parser.add_argument("--release",action="store_true",help="Public build: plain titles and original icons")
+parser.add_argument("--icons",help="Directory with valve.png and cstrike.png (default build/icons)")
 args=parser.parse_args()
 runtime_root=args.runtime_root or ("/mnt/FunKey/Xash3D-source" if args.native else "/mnt/FunKey/Xash3D")
 if not re.fullmatch(r"/mnt/FunKey/[A-Za-z0-9_-]+",runtime_root): parser.error("Invalid runtime directory")
 base=Path(__file__).resolve().parents[1]/'build'
-out=base/('native-dist' if args.native else 'dist')
+icons=Path(args.icons) if args.icons else base/'icons'
+out=base/('release-dist' if args.release else 'native-dist' if args.native else 'dist')
 out.mkdir(exist_ok=True)
-stage=base/('native-launcher-stage' if args.native else 'launcher-stage')
+stage=base/('release-launcher-stage' if args.release else 'native-launcher-stage' if args.native else 'launcher-stage')
 common='''// RG Nano controls and modest memory settings.
 unbindall
 bind "ESCAPE" "cancelselect"
@@ -82,7 +85,7 @@ data=base/'config-stage'
 for game,title,server,extra in [
  ('valve','Half-Life','hl',' +map c0a0'),
  ('cstrike','Counter-Strike','cs',' +maxplayers 4 +sv_lan 1 +exec nano-offline.cfg +map de_dust')]:
-    if args.native: title += " (source)"
+    if args.native and not args.release: title += " (source)"
     target=stage/game
     target.mkdir(parents=True,exist_ok=True)
     (target/'xash3d.png').unlink(missing_ok=True)
@@ -91,9 +94,9 @@ ROOT={runtime_root}
 exec "$ROOT/nano-run.sh" "$ROOT" {game}
 '''
     (target/'launch.sh').write_text(launcher,newline='\n')
-    (target/f'{game}.funkey-s.desktop').write_text(f'[Desktop Entry]\nName={title}\nComment={title} for RG Nano\nExec=launch.sh\nIcon={game}\nCategories=games\n',newline='\n')
-    shutil.copy2(base/'icons'/f'{game}.png',target/f'{game}.png')
-    shutil.copy2(base/'icons'/f'{game}.png',out/f'{title}.png')
+    (target/f'{game}.funkey-s.desktop').write_text(f'[Desktop Entry]\nName={title}\nComment={title} for RG Nano and FunKey S\nExec=launch.sh\nIcon={game}\nTerminal=false\nType=Application\nStartupNotify=false\nCategories=games;\n',newline='\n')
+    shutil.copy2(icons/f'{game}.png',target/f'{game}.png')
+    shutil.copy2(icons/f'{game}.png',out/f'{title}.png')
     cfgdir=data/game
     cfgdir.mkdir(parents=True,exist_ok=True)
     binds='bind "1" "+lookup"\nbind "3" "+lookdown"\nbind "2" "+attack2"\nbind "4" "savequick"\nbind "5" "loadquick"\nbind "p" "impulse 100"\nbind "f" "invnext"\n'
@@ -121,7 +124,10 @@ exec "$ROOT/nano-run.sh" "$ROOT" {game}
     (cfgdir/'userconfig.cfg').write_text('exec nano-controls.cfg\n',newline='\n')
     if game=='cstrike':
         (cfgdir/'nano-offline.cfg').write_text('bot_quota 2\nbot_join_after_player 1\nbot_difficulty 0\nmp_startmoney 16000\nmp_freezetime 1\nmp_roundtime 1\nmp_timelimit 0\n',newline='\n')
-        (cfgdir/'listenserver.cfg').write_text('sv_aim 0\npausable 0\nsv_maxspeed 320\nsv_cheats 0\nexec nano-offline.cfg\n',newline='\n')
+        listen='sv_aim 0\npausable 0\nsv_maxspeed 320\nsv_cheats 0\nexec nano-offline.cfg\n'
+        (cfgdir/'listenserver.cfg').write_text(listen,newline='\n')
+        # Steam's own listenserver.cfg can replace ours; nano-run.sh restores it from this copy.
+        (cfgdir/'nano-listenserver.cfg').write_text(listen,newline='\n')
 keymap='''CLEAR
 MAP FN       TO KEY     KEY_C
 MAP START    TO KEY     KEY_P
@@ -149,10 +155,10 @@ MAP FN+L     TO KEY     KEY_4
 MAP FN+R     TO KEY     KEY_5
 MAP FN+START+L TO KEY    KEY_6
 MAP FN+START+R TO KEY    KEY_7
-MAP FN+L+R   TO COMMAND /mnt/FunKey/Xash3D/nano-supervise-arm --stop /run/xash-nano.sock
+MAP FN+L+R   TO COMMAND @ROOT@/nano-supervise-arm --stop /run/xash-nano.sock
 MAP FN+START+L+R TO COMMAND system_stats toggle
 '''
-keymap=keymap.replace('/mnt/FunKey/Xash3D/',runtime_root+'/')
+# nano-run.sh replaces @ROOT@ with the installed location before loading the keymap.
 (data/'nano.key').write_text(keymap,newline='\n')
 # The first 71 key-name table indices equal Linux codes on the installed daemon.
 # Send each button independently: firmware chords would consume R and lose simultaneous actions.
@@ -161,7 +167,7 @@ physical=['UP','DOWN','LEFT','RIGHT','A','B','X','Y','L','R','START','FN']
 raw_keys=[f'KEY_F{i}' for i in range(1,11)]+['KEY_NUMLOCK','KEY_SCROLLLOCK']
 face_keymap+=''.join(f'MAP {button} TO KEY {key}\n' for button,key in zip(physical,raw_keys))
 face_keymap+='MAP MENU TO KEY KEY_ESC\n'
-face_keymap+='MAP FN+L+R TO COMMAND '+runtime_root+'/nano-supervise-arm --stop /run/xash-nano.sock\n'
+face_keymap+='MAP FN+L+R TO COMMAND @ROOT@/nano-supervise-arm --stop /run/xash-nano.sock\n'
 face_keymap+='MAP FN+START+L+R TO COMMAND system_stats toggle\n'
 for button,command in [('A','volume up'),('Y','volume down'),('X','brightness up'),('B','brightness down')]:
     face_keymap+=f'MAP FN+START+{button} TO COMMAND {command}\n'

@@ -2,6 +2,14 @@
 
 Checks were performed on an RG Nano with 56,164 KiB total RAM, SD-backed swap and FunKeyOS 2.3.0/DrUm78 firmware. Both launch paths use 1200 MHz while playing and restore 1008 MHz on exit.
 
+## Public release (v1.0.0, 7 October 2026)
+
+- **Clean build:** a fresh clone of the committed revision rebuilt every component from the pinned upstream sources and repository patches. After stripping, `libmenu.so` and `libref_soft.so` are byte-identical to the device-tested UI build. The other components differ only in embedded build dates, source paths and git hash length, at identical sizes. `libxash.so` also carries the new power-off patch.
+- **Fresh install:** the release was installed into a separate folder over a copy of the user's game data with all Nano-specific files removed, as a new player would have it. It was launched through `opkrun` like gmenu2x and RetroFE do. The menu artwork built on the console in 2–3 s per game, byte-identical to the PC-prepared artwork. The launcher icons were written into the uncompressed OPKs and box art, identical to the icons from local assembly. gmenu2x reads the placeholder and the final icon from these OPKs. Menus render in the Wine font.
+- **Lid close / power button (test mode):** a stand-in for `powerdown schedule 0.1` sent the real signal. Both frontends record `nano-run.sh` as the game's PID (a dummy OPK checked both launch paths). The launcher cancelled the shutdown in time. Half-Life saved `nano_poweroff.sav` with its preview, quit, restored 1008 MHz and the firmware keymap, and wrote an Instant Play file in FunKey OS's format. Running that file as `instant_play load` does resumed the tram ride at the saved point. Counter-Strike quit with exit code 0 and wrote no resume file. The first engine build was killed by the signal: the client engine installs no handlers, and the patch now installs its own.
+- **Counter-Strike `listenserver.cfg`:** a Steam copy placed over ours was moved to `listenserver.cfg.steam` and replaced at launch.
+- **Not yet tested:** a FunKey S, and the RG Nano's real power-off and cold boot into the resumed game.
+
 ## Established SDL ports
 
 - The pinned build recipe produced ARM CS client/server/menu libraries, the software renderer and static helpers using FunKey SDK 2.3.0. Private assembly with user-supplied Steam assets, the external base OPK and the Nano’s SDL passed; no assets or runtime binaries are published.

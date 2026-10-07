@@ -119,7 +119,7 @@ int main(){
  nativeMenu=false;assert(!m.KeyDown(K_F8) && !m.KeyUp(K_F8));
 }
 '''
-p=root/'build/ui-visual/save-browser-test.cpp';p.write_text(code);exe=p.with_suffix('')
+p=root/'build/ui-visual/save-browser-test.cpp';p.parent.mkdir(parents=True,exist_ok=True);p.write_text(code);exe=p.with_suffix('')
 subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(root/'src'),'-I'+str(native/'xash3d/engine'),str(p),'-o',str(exe)],check=True)
 subprocess.run([str(exe)],check=True)
 print('Actual save browser: 3-row scrolling/texture ownership, A/X/Y/B, cancel, fixed confirmation targets, new-slot guards, deletion refresh and command validation passed.')

@@ -32,5 +32,5 @@ if __name__ == '__main__':
         for extension in ('opk', 'png'):
             filename = f'{title}{label_suffix}.{extension}'
             run('push', str(dist/filename), f'/mnt/Native games/{filename}')
-    run('shell', 'chmod +x '+ ' '.join(device_root+'/'+path for path in ('engine/xash3d','nano-clk-arm','seed-rng-arm','nano-supervise-arm','nano-run.sh'))+'; sync')
+    run('shell', 'chmod +x '+ ' '.join(device_root+'/'+path for path in ('engine/xash3d','nano-clk-arm','seed-rng-arm','nano-supervise-arm','nano-art-arm','nano-run.sh'))+'; sync')
     print('Installed. Refresh Native games or restart the frontend to reload icons.')

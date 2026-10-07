@@ -1,112 +1,149 @@
-# Half-Life and Counter-Strike for RG Nano
+# Half-Life and Counter-Strike for RG Nano and FunKey S
 
-Source-built Half-Life and Counter-Strike 1.6 ports for the RG Nano running FunKeyOS/DrUm78 firmware, adapted for its 240×240 screen and built-in buttons.
+Half-Life and Counter-Strike 1.6 running natively on the tiny 240×240 screen of the **Anbernic RG Nano** and the **FunKey S**, with menus, HUD and controls made for them.
 
-The current ports build the **Xash3D FWGS engine, software renderer, filesystem, menus and game libraries from pinned public source**. They use Linux framebuffer, evdev input and the Nano's ALSA audio stack directly. **The source-built installation does not require the XASH3DFS OPK or its engine/Half-Life binaries.**
+<p>
+<img src="docs/images/hl-menu.png" width="240" alt="Half-Life main menu">
+<img src="docs/images/hl-game.png" width="240" alt="Half-Life gameplay">
+<img src="docs/images/cs-menu.png" width="240" alt="Counter-Strike match setup">
+<img src="docs/images/cs-game.png" width="240" alt="Counter-Strike gameplay">
+</p>
 
-This repository contains source, patches, build recipes and tests. No prebuilt runtime, Valve game data, extracted icons, font or bot navigation file is included. Supply your own Half-Life and Counter-Strike installation. Components retain their individual licenses, including Valve's Half-Life SDK terms; the commercial games are not open source.
+**No game files are included.** You need your own copy of Half-Life (and Counter-Strike 1.6 if you want it), for example from Steam.
 
-## Current features
+## Download
 
-- **Half-Life:** starts the opening campaign; supports weapons, saves/loads and tested level transitions.
-- **Counter-Strike:** starts an offline de_dust match with two easy bots and one-minute rounds. Select a team and appearance; respawn occurs at the next round.
-- **Controls:** precise default aim, L for fast aim, R for pitch/strafing, X fire and Y reload. Held horizontal turning gradually accelerates; movement and vertical look do not accelerate.
-- **Display:** original map skyboxes and HUD artwork, independent HUD scales, compact radar, symmetric crosshair, readable team/buy menus and larger main/pause/settings menus.
-- **Settings:** **Menu → Options → Nano settings** offers FPS-limit/frame-sleep toggles, an FPS slider, aiming/acceleration controls and separate HUD sliders. Choices save per game.
-- **Audio:** source-built ALSA streaming and targeted speaker/volume initialization. Immediate sound startup is confirmed on the physical Nano.
-- **Launch/recovery:** every launch applies **1200 MHz**; cleanup restores **1008 MHz** and firmware keys. **Fn + L + R** requests supervised shutdown.
-- **Launcher entries:** `Half-Life (source)` and `Counter-Strike (source)`, with icons extracted locally from each game's `game.ico`.
+Get the latest zip from the [Releases page](https://github.com/DankMiimer/rg-nano-xash3d/releases/latest).
 
-Fresh assemblies default to **30 FPS in both games**, frame sleeping enabled and VSync disabled. The tested device has 30 FPS saved for Half-Life and 40 FPS for Counter-Strike. A cap is a maximum, not a guaranteed frame rate.
+## What you need
 
-UI profile v2 adapts the shared menus and native HUD canvas for the square display. See [UI changes and validation](docs/NANO-UI-V2.md) and [saved settings](docs/NANO-SETTINGS.md). A minimal update can be prepared with `tools/package_ui_update.py`; review the candidate and approve device changes before installation.
+- An **RG Nano** or a **FunKey S** running [DrUm78's FunKey OS](https://github.com/DrUm78/FunKey-OS/releases).
+- **Half-Life** from Steam. Counter-Strike 1.6 is optional.
+- About **900 MB** free on the SD card.
 
-The [native menu appearance layer](docs/NANO-UI-VISUAL.md) adds classic game colours, controls and prepared artwork, plus a three-entry Half-Life save browser and the real Valve intro with its original sound. ARM builds and host checks pass; this appearance layer awaits physical-device validation.
+## Install
+
+1. **Put the SD card in your PC.** Use a card reader, or connect the console over USB and choose *Mount USB* in its menu.
+2. **Copy your game files.** In Steam, right-click Half-Life → *Manage* → *Browse local files* (usually `Steam\steamapps\common\Half-Life`). Copy the `valve` folder, and the `cstrike` folder if you have Counter-Strike, into `FunKey\Xash3D-source` on the SD card. Create that folder if it doesn't exist.
+3. **Copy the release.** Unzip the download and copy everything inside its `SD card` folder to the root of the SD card. Choose *Replace* when asked.
+4. **Play.** Put the card back, open **Native games** and start **Half-Life** or **Counter-Strike**.
+
+The first start takes a few seconds longer: the game builds its menu artwork and launcher icon from your own game files. The new icon appears after the next restart.
+
+When you're done the SD card looks like this:
+
+```
+SD card
+├── FunKey
+│   └── Xash3D-source
+│       ├── valve       ← your Half-Life files + this release
+│       ├── cstrike     ← your Counter-Strike files + this release
+│       ├── engine
+│       └── …
+└── Native games
+    ├── Half-Life.opk
+    └── Counter-Strike.opk
+```
 
 ## Controls
 
 | Button | Action |
 |---|---|
-| D-pad Up/Down | Walk forward/backward |
-| D-pad Left/Right | Turn |
-| Hold R + Up/Down | Look up/down |
-| Hold R + Left/Right | Strafe |
-| Hold L | Fast camera look |
-| X / Y | Fire / reload |
-| A / B | Use / jump |
-| Hold Fn/Select | Crouch |
-| Menu | Menu/back |
-| Start | HL flashlight; CS buy menu |
-| Fn + Start | HL next weapon; CS autobuy |
-| Fn + L / R | HL quick-save / quick-load |
-| Fn + L + R | Stop game and recover launcher |
+| D-pad | Walk and turn |
+| Hold **R** + D-pad | Look up/down and strafe |
+| Hold **L** | Faster camera |
+| **X** / **Y** | Shoot / reload |
+| **A** / **B** | Use / jump |
+| Hold **Fn** | Crouch |
+| **Start** | Half-Life: flashlight · Counter-Strike: buy menu |
+| **Fn + Start** | Half-Life: next weapon · Counter-Strike: auto-buy |
+| **Fn + L** / **Fn + R** | Half-Life: quick save / quick load |
+| **Menu** | Game menu: save, load, options, quit |
+| **Fn + A** / **Fn + Y** | Volume up / down |
+| **Fn + X** / **Fn + B** | Brightness up / down |
+| Hold **Fn + L + R** | Force quit if a game is stuck |
 
-CS numbers: **Fn + Left/Down/Right** selects **1/2/3**; **Fn + Start + L/R** selects **4/5**. Choose a team, then an appearance. CS cannot save an offline multiplayer round.
+In Counter-Strike menus, **Fn + Left / Down / Right** pick 1 / 2 / 3 and **Fn + Start + L / R** pick 4 / 5.
 
-Firmware shortcuts remain: **Fn + A/Y** for volume, **Fn + X/B** for brightness and **Fn + Up** for screenshots. See [all controls](docs/CONTROLS.md) and [settings defaults](docs/NANO-SETTINGS.md).
+Prefer aiming with the face buttons? Turn on **Face-button aiming** under *Nano settings → Control scheme* and restart the game. See [all controls](docs/CONTROLS.md).
 
-## Build and install
+## Good to know
 
-Use Linux or Ubuntu under WSL with Python **3.12+**, Pillow, Git, CMake, Ninja, a native C compiler, squashfs-tools and ADB. Install **FunKey SDK 2.3.0** separately from the [FunKey OS releases](https://github.com/FunKey-Project/FunKey-OS/releases). Revisions and submodules are pinned in [sources.lock.json](sources.lock.json).
+- **Closing the lid saves.** Closing the FunKey S lid, or pressing the RG Nano power button, saves Half-Life and switches the console off. Turn it on again and you continue where you left off. Counter-Strike just closes.
+- **Saves:** in Half-Life, *Menu → Save/Load Game* shows three saves at a time with pictures (**A** load, **X** save, **Y** delete).
+- **Counter-Strike** starts with an offline match setup: choose the map, the number of bots (0–7) and the difficulty. Bots need a navigation file for each map, which a new install doesn't have yet. If you see *No NAV: bots 0 or Advanced*, either play with 0 bots, or open *Advanced*, tick *Allow slow NAV analysis* and start. The console then spends a few minutes (once per map) mapping it for the bots.
+- **Settings** for frame rate, aiming and HUD size are under *Nano settings* in each game's options.
+- **Performance:** both games are capped at 30 FPS by default and held that in the tested scenes. Busy scenes can drop below it, and there are pauses while levels load: these consoles only have 64 MB of RAM.
 
-Run from the repository root:
+## Updating
+
+Repeat install step 3 with the new release. Your saves and settings are kept.
+
+## Uninstalling
+
+Delete `Native games\Half-Life.opk`, `Native games\Counter-Strike.opk` and the `FunKey\Xash3D-source` folder (this also deletes your saves).
+
+## Troubleshooting
+
+- **"Files missing" message:** check that the `valve` (and `cstrike`) folders are directly inside `FunKey\Xash3D-source`, not one folder deeper.
+- **The game stops responding:** hold **Fn + L + R** for a few seconds.
+- **Logs** are in `FunKey\Xash3D-source\diagnostics`. Please attach them when you [report a problem](https://github.com/DankMiimer/rg-nano-xash3d/issues).
+
+---
+
+## Technical details
+
+Everything below is for people who want to know how it works or build it themselves.
+
+### How it works
+
+- The engine is [Xash3D FWGS](https://github.com/FWGS/xash3d-fwgs) with its software renderer, built from pinned source with the FunKey SDK. It draws straight to the Linux framebuffer, reads the buttons through evdev and streams sound through ALSA. No SDL and no external OPK are used.
+- Half-Life uses [HLSDK Portable](https://github.com/FWGS/hlsdk-portable). Counter-Strike uses [CS16Client](https://github.com/Velaron/cs16-client) and [ReGameDLL_CS](https://github.com/s1lentq/ReGameDLL_CS) with bots.
+- The launcher (`nano-run.sh`) raises the CPU to 1200 MHz while playing and restores 1008 MHz afterwards. It also loads the game's button map, sets up audio and supervises the game (Fn + L + R recovery, logs).
+- Menus and the HUD are adapted for a square 240×240 screen; see [UI changes](docs/NANO-UI-V2.md) and [menu appearance](docs/NANO-UI-VISUAL.md). Memory work (texture sharing, demand-zero pools) is described in [MEMORY.md](docs/MEMORY.md).
+
+### RG Nano and FunKey S
+
+Both consoles have the same Allwinner V3s chip, 64 MB of RAM and 240×240 screen, and DrUm78's FunKey OS runs them on the same board definition, button daemon and audio setup. The port uses no kernel modules, and its CPU clock tool is the one [NanoCraft](https://github.com/DankMiimer/nanocraft) already uses on both consoles.
+
+The one real difference is the FunKey S lid. On power-off, FunKey OS sends `SIGUSR1` to the running game and powers off 0.1 s later unless the game takes over. The launcher takes over, and the engine saves single-player progress to `nano_poweroff` and quits normally. The launcher then writes FunKey OS's standard *Instant Play* file and powers off. On the next boot FunKey OS starts the launcher again, which loads that save. This is the same mechanism FunKey OS emulators use. Details: [POWER-OFF.md](docs/POWER-OFF.md).
+
+Release testing covered the RG Nano. A FunKey S has not been tested yet; reports are welcome.
+
+### Release contents
+
+The release zip contains the engine, the game libraries (built from the GPL and Valve SDK sources above), the launchers and a free Tahoma-compatible menu font from Wine. It contains **no Valve game data or artwork**:
+
+- The menu backgrounds and logos, and the launcher icons, are built on the console at first launch from the player's own files by `nano-art` ([src/nano-art.c](src/nano-art.c)). It gives the same result as the PC script `tools/prepare_menu_art.py`.
+- The optional Valve intro needs `tools/prepare_intro.py` and FFmpeg on a PC. See [menu appearance](docs/NANO-UI-VISUAL.md).
+- Bot navigation files are generated on the console the first time a map is played with bots.
+
+### Building from source
+
+Use Linux or Ubuntu under WSL with Python 3.12+, Pillow, Git, CMake, Ninja, GCC, squashfs-tools and ADB, plus **FunKey SDK 2.3.0** from the [FunKey OS releases](https://github.com/FunKey-Project/FunKey-OS/releases). Upstream revisions are pinned in [sources.lock.json](sources.lock.json). Build outside your home folder: compiled-in source paths would otherwise include your user name, and the release packager refuses that.
 
 ```sh
-sudo apt install git cmake ninja-build gcc squashfs-tools python3-pil adb
 export FUNKEY_SDK=/absolute/path/to/FunKey-sdk-2.3.0
-# Optional: a Linux filesystem speeds up native builds under WSL.
-export NANO_NATIVE_DIR=/absolute/path/to/native-build
-
-# CS libraries/menu, standalone renderer and launch helpers:
-bash tools/build.sh
-# Engine, filesystem, native renderer/menu and Half-Life libraries:
-bash tools/build-native.sh
-
-python3 tools/prepare_native.py \
-  --games /absolute/path/to/your/Half-Life \
-  --native-build "$NANO_NATIVE_DIR" \
-  --sdk "$FUNKEY_SDK" \
-  --font /absolute/path/to/FiraSans-Regular.ttf \
-  --nav /absolute/path/to/your/de_dust.nav
-
-# Quit either game, then connect the Nano in ADB mode:
-python3 tools/install.py --native
+export NANO_NATIVE_DIR=/var/tmp/rg-nano-native   # a Linux filesystem builds much faster under WSL
+bash tools/build.sh                  # CS libraries and menu, renderer, Nano helper tools
+bash tools/build-native.sh           # engine, filesystem, menu and Half-Life libraries
+python3 tools/package_release.py --version v1.0.0   # → build/release/*.zip
 ```
 
-The `--games` directory must contain `valve/` and `cstrike/`, including each `game.ico`. Supply a usable TrueType font; [Fira Sans](https://github.com/mozilla/Fira) is one option. `--nav` imports one matching Dust NAV; `--nav-directory` imports matching NAVs for multiple maps. No NAV is supplied or downloaded. [Offline match setup](docs/CS-MATCH-SETUP.md) offers installed maps, 0–7 bots, four stock difficulties, team placement and advanced match settings. Bot analysis requires explicit opt-in; maps without NAVs can also be played with zero bots.
+For a private install that also includes your game data, the PC-prepared artwork and the Valve intro, use `tools/prepare_native.py` and `tools/install.py --native` instead (see [LEGACY.md](docs/LEGACY.md) for the older SDL setup). Host regression tests are listed in [TESTING.md](docs/TESTING.md). Hardware evidence and its limits are in [VALIDATION.md](docs/VALIDATION.md).
 
-Assembly requires a fresh output directory and creates `build/native-runtime/` plus launcher OPKs/icons in `build/native-dist/`. These private outputs include your game data and are excluded from Git. The OPKs are launchers, not standalone game packages.
+### Diagnostics
 
-Installation uses `/mnt/FunKey/Xash3D-source` and adds the `(source)` entries to Native games. Refresh that collection or restart the frontend to reload icons. A fresh assembly excludes personal saves; installation does not delete the existing device save directory. Keep assembled outputs private.
+Logs live in `diagnostics/valve` and `diagnostics/cstrike`: `engine.log`, resource samples in `metrics.csv`, exit details in `result.txt`, and first-launch artwork in `art.log`. `NANO_PROFILE=1` enables frame timing. The console commands `nano_mem` and `nano_tex` report memory use. More in [PERFORMANCE.md](docs/PERFORMANCE.md) and [LOADING-AUDIO.md](docs/LOADING-AUDIO.md).
 
-The runtime uses firmware libc, ALSA and hardware drivers. SDK dependencies are resolved during assembly; `source-runtime.json` records source pins, patch and component hashes. See [SOURCES.md](SOURCES.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+### Known limits
 
-The earlier SDL/XASH3DFS setup remains separate under `/mnt/FunKey/Xash3D`. Instructions are in [LEGACY.md](docs/LEGACY.md).
-
-## Validation and limits
-
-Physical-device feedback confirms rendering, menus, movement, shooting, immediate audio, controls, HUD layout and the original CS skybox. Bounded runs cover CS deaths/spectating/respawns and reloads, and HL saves/loads and several campaign transitions. See [VALIDATION.md](docs/VALIDATION.md) and [regression checks](docs/TESTING.md) for evidence and scope.
-
-These remain experimental ports on a device with very limited RAM. Loading and paging stalls persist. Full campaign coverage, arbitrary mods/maps and network multiplayer are not validated. The [native menu appearance](docs/NANO-UI-VISUAL.md) layer now has representative device checks; specialized touch/gamepad editors have limited hardware coverage. Targeted audio startup avoids the demonstrated broad mixer scan; the underlying firmware driver lock remains unresolved.
-
-Texture changes remove unused menu/sprite/model mips and share identical converted buffers, saving approximately **27 MiB of tracked allocation** in the tested CS scene while retaining base pixels and world mipmaps. This is not a whole-process RAM or guaranteed FPS saving. Large cleared allocations avoid eagerly touching unused pages. Controlled load tests showed improved colder medians, with overlapping warm results. See [MEMORY.md](docs/MEMORY.md), [DEMAND-ZERO.md](docs/DEMAND-ZERO.md) and [LOAD-BENCHMARK.md](docs/LOAD-BENCHMARK.md).
-
-Latest work: [original sky rendering](docs/SKYBOX.md) and [model/sound measurements](docs/MODEL-SOUND.md). The [roadmap](docs/ROADMAP.md) prioritizes animation-storage investigation and broader campaign checks before quality reductions.
-
-## Recovery and diagnostics
-
-Hold **Fn + L + R** to stop the game. The supervisor targets its own process group, sends TERM and escalates to KILL after five seconds if needed. Cleanup restores stock clock and firmware keys. Userspace recovery cannot guarantee recovery from a kernel lock.
-
-Logs are under `diagnostics/valve` or `diagnostics/cstrike`: `engine.log`, resource samples in `metrics.csv`, and exit details in `result.txt`. Engine/metric logs retain two bounded files each. There is no automatic freeze detector. Review private logs before sharing.
-
-Optional `NANO_PROFILE=1` enables frame timing without an overlay. Console commands `nano_mem` and `nano_tex` report pool/asset categories and texture storage on request, without allocation-chain scans or automatic gameplay reports. More detail: [performance](docs/PERFORMANCE.md) and [loading/audio](docs/LOADING-AUDIO.md).
+These are experimental ports on a device with very little RAM. Loading and paging stalls remain. The full campaign, arbitrary mods and maps, and network multiplayer are not validated. See the [roadmap](docs/ROADMAP.md).
 
 ## License and credits
 
-Support tools and menu integration are GPL-3.0-or-later. Small aiming, HUD, crosshair, frame-statistics, texture-sharing, sky-projection and numeric-settings helpers are MIT, as marked in each file. Upstream code retains its applicable licenses. Half-Life SDK code remains under Valve's SDK terms, including free distribution and required notices. See [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [SOURCES.md](SOURCES.md) and `licenses/`.
+Nano tools and menu integration are GPL-3.0-or-later; small helpers are MIT, as marked in each file. Upstream code keeps its own licenses, and Half-Life SDK code stays under Valve's SDK terms. The release font is Wine's Tahoma (LGPL-2.1-or-later, derived from Bitstream Vera). See [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [SOURCES.md](SOURCES.md) and `licenses/`.
 
-Credits: FWGS/Xash3D and HLSDK Portable contributors; Velaron/CS16Client; ReGameDLL_CS; FunKey-Project and firmware maintainers; DankMiimer/NanoCraft for the clock helper; and Sn3zee-cmds/XASH3DFS for the original packaged port that started this work. This independent project is unaffiliated with Valve or Anbernic.
+Thanks to FWGS and the Xash3D and HLSDK Portable contributors, Velaron (CS16Client), the ReGameDLL_CS authors, the FunKey project and DrUm78 for FunKey OS, Sn3zee-cmds for the XASH3DFS port that started this work, and reno, whose FunKey ports showed how a native port should behave on these consoles.
 
-Optional face-button aiming in Nano settings: D-pad movement, face-button camera, L shoot and R modifier. See [controls](docs/CONTROLS.md).
-
-The optional aiming preset also supports Select + face buttons for quarter-speed aiming; tapping Select reloads.
+This is an unofficial fan project, not affiliated with Valve, Anbernic or the FunKey project. Half-Life and Counter-Strike are trademarks of Valve Corporation.

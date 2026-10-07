@@ -38,7 +38,7 @@ def main():
     cs=ROOT/'build/cs-install/cstrike'
     required=[engine/name for name in ('xash3d','libxash.so','libmenu.so','libref_soft.so','filesystem_stdio.so','valve/extras.pk3')]
     required += [hl/'valve/cl_dlls/client_armv7hf.so',hl/'valve/dlls/hl_armv7hf.so',a.font]
-    required += [ROOT/'build/bin'/name for name in ('nano-clk-arm','seed-rng-arm','nano-supervise-arm')]
+    required += [ROOT/'build/bin'/name for name in ('nano-clk-arm','seed-rng-arm','nano-supervise-arm','nano-art-arm')]
     required += [cs/rel for rel in ('cl_dlls/client_armv7hf.so','cl_dlls/menu_armv7hf.so','dlls/cs_armv7hf.so','extras.pk3')]
     for file in required:
         if not file.is_file(): p.error(f'Missing build/input: {file}')
@@ -59,7 +59,7 @@ def main():
         copy(hl/rel,a.output/rel)
     for rel in ('cl_dlls/client_armv7hf.so','cl_dlls/menu_armv7hf.so','dlls/cs_armv7hf.so','extras.pk3'):
         copy(cs/rel,a.output/'cstrike'/rel)
-    for name in ('nano-clk-arm','seed-rng-arm','nano-supervise-arm'):
+    for name in ('nano-clk-arm','seed-rng-arm','nano-supervise-arm','nano-art-arm'):
         copy(ROOT/'build/bin'/name,a.output/name)
     copy(ROOT/'tools/nano-run.sh',a.output/'nano-run.sh')
     copy(ROOT/'tools/nano-ui-migrate.sh',a.output/'nano-ui-migrate.sh')

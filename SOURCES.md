@@ -23,7 +23,7 @@ The table below records the original legacy installation; the [independent nativ
 
 At the time of preparation, the XASH3DFS repository exposes a README, packaged OPK and icon, rather than the corresponding Nano port source. The upstream FWGS revision supplies the renderer source used here, but does not establish that it is complete corresponding source for the modified Nano engine or the supplied Half-Life libraries.
 
-Accordingly, this repository is openly licensed **support code and patches**. It does not claim to relicense the entire installed runtime. Third-party compiled runtime libraries and game assets are excluded from Git and from repository releases. The legacy assembly still has that limitation. The separate native recipe reconstructs the hardware support from upstream source and small published patches; hardware checks now cover rendering, controls, audio and bounded gameplay. Extended campaign and network coverage remain incomplete.
+Accordingly, this repository is openly licensed **support code and patches**. It does not claim to relicense the entire installed runtime. Game assets are excluded from Git and from releases. Releases contain only the independently built native runtime described below; nothing from the XASH3DFS package is redistributed. The legacy assembly still has that limitation. The separate native recipe reconstructs the hardware support from upstream source and small published patches; hardware checks now cover rendering, controls, audio and bounded gameplay. Extended campaign and network coverage remain incomplete.
 
 The assembly recipe patches two exact binary strings locally: `/dev/random` becomes a launcher-created `/tmp/xash-r` symlink to `/dev/urandom`, and the private Nano SDL's `/dev/dsp` device name becomes ALSA `default`. It deliberately rejects unexpected input strings rather than guessing offsets.
 
@@ -42,6 +42,21 @@ There are no Steam credentials, account files, personal saves, RNG seeds, device
 `source-runtime.json` in each private native assembly records component/dependency hashes and that no external OPK was used. This documents the new build's provenance; it does not assert that it reproduces Sn3zee's implementation. Upstream credits remain intact, and no private port binary is reverse-engineered into the new engine.
 
 The Half-Life pin precedes the September 2026 freevgui SetPaintOffset extension, which the August engine does not implement. Engine and client revisions must be aligned when updating either.
+
+## Public releases
+
+`tools/package_release.py` builds the release zip from a committed revision. Releases are built outside any home folder, so compiled-in source paths name no user; the packager checks this.
+
+| Release content | Source and treatment |
+|---|---|
+| Engine, filesystem, renderer, menus, HL and CS libraries, Nano helper tools | Built from the pins and patches above with FunKey SDK 2.3.0, then `strip --strip-unneeded`. `source-runtime.json` records the commit, pins, patch hashes and component hashes |
+| SDK runtime libraries | FunKey SDK 2.3.0 sysroot, resolved by ELF NEEDED entries; licence texts in `licenses/runtime/` |
+| Menu font | Wine's Tahoma at `wine-10.0`, pinned by SHA-256 in `sources.lock.json`; its `.sfd` source and LGPL/Bitstream Vera licences ship in the zip |
+| Launcher icons | Plain placeholder drawn by `tools/make_icons.py`; replaced on the console by the icon in the player's own `game.ico` |
+| Menu artwork | Not shipped. Built on the console at first launch from the player's own files by `src/nano-art.c`; output matches `tools/prepare_menu_art.py` byte for byte |
+| Valve intro, NAV files, game data, saves, RNG seed | Not shipped |
+
+The packager refuses to finish if the zip contains game-data file types, a font other than the pinned one, or the builder's user name or home path.
 
 ## Nano aiming and HUD changes
 
