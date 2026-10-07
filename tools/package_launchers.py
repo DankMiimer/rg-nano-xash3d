@@ -104,14 +104,19 @@ exec "$ROOT/nano-run.sh" "$ROOT" {game}
         binds=''.join(f'bind "{i}" "slot{i}"\n' for i in range(1,4))
         binds+='bind "4" "+attack2"\nbind "5" "nano_centerview"\nbind "6" "slot4"\nbind "7" "slot5"\n'
         binds+='cl_oldtouchmenus "0"\n_vgui_menus "0"\nhud_fastswitch "1"\nspec_pip_allow "0"\nspec_pip_internal "0"\ncl_corpsestay "5"\ncl_shadows "0"\nbind "p" "buy"\nbind "f" "autobuy"\n'
-    game_common=common
-    if not args.native:
-        game_common=game_common.replace('hud_scale \"1\"','hud_scale \"0.65\"').replace('set nano_hud_bottom \"1.5\"','set nano_hud_bottom \"1.125\"').replace('set nano_hud_side \"1.5\"','set nano_hud_side \"1.125\"').replace('set nano_hud_menu \"1\"','set nano_hud_menu \"1.25\"')
-        game_common=re.sub(r'^set nano_(hud_text_height|ui_profile_version).*\n','',game_common,flags=re.M)
-    if game=='cstrike':
-        game_common=game_common.replace('set nano_hud_bottom "1.5"','set nano_hud_bottom "0.8"').replace('set nano_hud_side "1.5"','set nano_hud_side "0.8"')
+    if args.native:
+        # UI profile 3, as installed and approved on the device: HUD sizes come last,
+        # Half-Life uses exact 2x HUD sprites and both games a 2x crosshair.
+        game_common=re.sub(r'^(hud_scale "1"|set nano_hud_(bottom|side|menu|text_height) "[^"]*"|set nano_ui_profile_version "[^"]*")\n','',common,flags=re.M)
+        size='2' if game=='valve' else '0.8'
+        binds+=f'hud_scale "1"\nset nano_hud_bottom "{size}"\nset nano_hud_side "{size}"\nset nano_hud_menu "1"\nset nano_hud_text_height "14"\nset nano_ui_profile_version "3"\n'
     else:
-        game_common=game_common.replace('set nano_hud_crosshair "2"','set nano_hud_crosshair "1.5"')
+        game_common=common.replace('hud_scale \"1\"','hud_scale \"0.65\"').replace('set nano_hud_bottom \"1.5\"','set nano_hud_bottom \"1.125\"').replace('set nano_hud_side \"1.5\"','set nano_hud_side \"1.125\"').replace('set nano_hud_menu \"1\"','set nano_hud_menu \"1.25\"')
+        game_common=re.sub(r'^set nano_(hud_text_height|ui_profile_version).*\n','',game_common,flags=re.M)
+        if game=='cstrike':
+            game_common=game_common.replace('set nano_hud_bottom "1.5"','set nano_hud_bottom "0.8"').replace('set nano_hud_side "1.5"','set nano_hud_side "0.8"')
+        else:
+            game_common=game_common.replace('set nano_hud_crosshair "2"','set nano_hud_crosshair "1.5"')
     controls=re.sub(r'bind "([A-Z])"([^\n]*)',lambda m: 'bind "'+m[1].lower()+'"'+m[2]+'\nbind "'+m[1]+'"'+m[2],game_common+binds)
     (cfgdir/'nano-controls.cfg').write_text(controls,newline='\n')
     face_commands=['+forward','+back','+moveleft','+moveright','+right','+lookdown','+lookup','+left',
