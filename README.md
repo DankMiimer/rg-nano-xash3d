@@ -145,6 +145,6 @@ These are experimental ports on a device with very little RAM. Loading and pagin
 
 Nano tools and menu integration are GPL-3.0-or-later; small helpers are MIT, as marked in each file. Upstream code keeps its own licenses, and Half-Life SDK code stays under Valve's SDK terms. The release font is Wine's Tahoma (LGPL-2.1-or-later, derived from Bitstream Vera). See [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [SOURCES.md](SOURCES.md) and `licenses/`.
 
-Thanks to FWGS and the Xash3D and HLSDK Portable contributors, Velaron (CS16Client), the ReGameDLL_CS authors, the FunKey project and DrUm78 for FunKey OS, Sn3zee-cmds for the XASH3DFS port that started this work, and reno, whose FunKey ports showed how a native port should behave on these consoles.
+Thanks to FWGS and the Xash3D and HLSDK Portable contributors, Velaron (CS16Client), the ReGameDLL_CS authors, the FunKey project and DrUm78 for FunKey OS, Sn3zee-cmds for the XASH3DFS port that started this work, and reno for his FunKey ports.
 
 This is an unofficial fan project, not affiliated with Valve, Anbernic or the FunKey project. Half-Life and Counter-Strike are trademarks of Valve Corporation.
