@@ -1,0 +1,28 @@
+--- a/menus/Main.cpp
++++ b/menus/Main.cpp
+@@ -181,7 +181,7 @@
+ 
+ 	nanoSpectator.SetNameAndStatus("Spectator options",NULL);nanoSpectator.SetPicture(PC_RESUME_GAME);
+     SET_EVENT_MULTI(nanoSpectator.onReleased,{UI_SetActiveMenu(false);EngFuncs::ClientCmd(false,"_spec_toggle_menu\n");});
+-    AddItem(nanoSpectator);
++    // Register this below with its neighbours in the displayed menu.
+     // console
+ 	console.SetNameAndStatus( L( "GameUI_Console" ), NULL );
+ 	console.iFlags |= QMF_NOTIFY;
+@@ -312,6 +312,7 @@
+ 
+ 	AddItem( readme );
+ 	AddItem( previews );
++	AddItem( nanoSpectator );
+ 	AddItem( quit );
+ 	AddItem( minimizeBtn );
+ 	AddItem( quitButton );
+@@ -418,6 +419,8 @@
+     const bool nano = ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile");
+     console.SetVisibility(gpGlobals->developer != 0 && !nano);
+     nanoLayout = nano;
++    // Omit unused entries from Nano drawing and keyboard navigation.
++    customGame.SetVisibility(!nano);previews.SetVisibility(!nano);readme.SetVisibility(!nano);
+     nanoSpectator.SetVisibility(nano && CL_IsActive() && EngFuncs::GetCvarFloat("nano_observing"));
+     if (nano && !stricmp(gMenu.m_gameinfo.gamefolder,"cstrike")) {
+         multiPlayer.SetNameAndStatus("Offline match", "Choose map, bots and difficulty");

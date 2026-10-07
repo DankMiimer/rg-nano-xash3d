@@ -1,0 +1,287 @@
+--- a/ref/soft/r_draw.c
++++ b/ref/soft/r_draw.c
+@@ -14,6 +14,7 @@
+ */
+ 
+ #include "r_local.h"
++#include "nano-ui-alpha.h"
+ 
+ /*
+ =============
+@@ -114,7 +115,7 @@
+ 
+ 			if( transparent )
+ 			{
+-				alpha &= src >> ( 16 - 3 );
++				alpha = (alpha * (src >> (16 - 3)) + 3) / 7;
+ 				src = src << 3;
+ 			}
+ 
+@@ -137,7 +138,7 @@
+ 			else if( alpha < 7 ) // && (vid.rendermode == kRenderTransAlpha || vid.rendermode == kRenderTransTexture ) )
+ 			{
+ 				pixel_t screen = dest[u];                    //  | 0xff & screen & src ;
+-				dest[u] = BLEND_ALPHA( alpha, src, screen ); // vid.alphamap[( alpha << 16)|(src & 0xff00)|(screen>>8)] << 8 | (screen & 0xff) >> 3 | ((src & 0xff) >> 3);
++				dest[u] = NanoUIBlend(alpha,src,screen); // vid.alphamap[( alpha << 16)|(src & 0xff00)|(screen>>8)] << 8 | (screen & 0xff) >> 3 | ((src & 0xff) >> 3);
+ 			}
+ 			else
+ 				dest[u] = src;
+@@ -213,7 +214,7 @@
+ 			else if( alpha < 7 ) // && (vid.rendermode == kRenderTransAlpha || vid.rendermode == kRenderTransTexture ) )
+ 			{
+ 				pixel_t screen = dest[u];                    //  | 0xff & screen & src ;
+-				dest[u] = BLEND_ALPHA( alpha, src, screen ); // vid.alphamap[( alpha << 16)|(src & 0xff00)|(screen>>8)] << 8 | (screen & 0xff) >> 3 | ((src & 0xff) >> 3);
++				dest[u] = NanoUIBlend(alpha,src,screen); // vid.alphamap[( alpha << 16)|(src & 0xff00)|(screen>>8)] << 8 | (screen & 0xff) >> 3 | ((src & 0xff) >> 3);
+ 			}
+ 			else
+ 				dest[u] = src;
+--- a/engine/client/dll_int/cl_game.c
++++ b/engine/client/dll_int/cl_game.c
+@@ -292,7 +292,25 @@
+ 
+ 	clgame.centerPrint.totalWidth = 0;
+ 	clgame.centerPrint.time = cl.mtime[0]; // allow pause for centerprint
+-	Q_strncpy( clgame.centerPrint.message, text, sizeof( clgame.centerPrint.message ));
++	Q_strncpy(clgame.centerPrint.message,text,sizeof(clgame.centerPrint.message));
++    if(Cvar_VariableValue("nano_hud_profile")) {
++        char wrapped[sizeof(clgame.centerPrint.message)];int used=0,start=0,space=-1;
++        for(const char *p=text;*p && used<(int)sizeof(wrapped)-2;++p) {
++            wrapped[used++]=*p;wrapped[used]=0;
++            if(*p=='\n'){start=used;space=-1;continue;}
++            if(*p==' ')space=used-1;
++            if(((byte)p[1]&0xc0)==0x80)continue;
++            int width;CL_DrawStringLen(font,wrapped+start,&width,NULL,FONT_DRAW_HUD|FONT_DRAW_UTF8);
++            if(width>refState.width-16) {
++                if(space>start){wrapped[space]='\n';start=space+1;space=-1;}
++                else {
++                    int rune=used-1;while(rune>start && ((byte)wrapped[rune]&0xc0)==0x80)--rune;
++                    if(rune>start){memmove(wrapped+rune+1,wrapped+rune,used-rune);wrapped[rune]='\n';++used;wrapped[used]=0;start=rune+1;}
++                }
++            }
++        }
++        Q_strncpy(clgame.centerPrint.message,wrapped,sizeof(clgame.centerPrint.message));
++    }
+ 
+ 	CL_DrawStringLen( font,
+ 		clgame.centerPrint.message,
+@@ -300,8 +318,11 @@
+ 		&clgame.centerPrint.totalHeight,
+ 		FONT_DRAW_HUD | FONT_DRAW_UTF8 );
+ 
+-	if( font->charHeight )
+-		clgame.centerPrint.lines = clgame.centerPrint.totalHeight / font->charHeight;
++	if(Cvar_VariableValue("nano_hud_profile")) {
++        clgame.centerPrint.lines=1;
++        for(const char *p=clgame.centerPrint.message;*p;p++)if(*p=='\n')++clgame.centerPrint.lines;
++    } else if( font->charHeight )
++        clgame.centerPrint.lines = clgame.centerPrint.totalHeight / font->charHeight;
+ 	else clgame.centerPrint.lines = 1;
+ 
+ 	clgame.centerPrint.y = CL_AdjustYPos( y, clgame.centerPrint.totalHeight );
+@@ -329,7 +350,7 @@
+ 	if (nano_hud_profile && nano_hud_profile->value)
+ 	{
+ 		NanoHudRect(x, y, w, h, refState.width, refState.height,
+-			nanoCrosshairDrawing ? Cvar_VariableValue("nano_hud_crosshair") : nano_hud_scale->value,
++			nanoCrosshairDrawing ? Cvar_VariableValue("nano_hud_crosshair")*0.65f : nano_hud_scale->value,
+ 			nanoCrosshairDrawing ? 0.5f : nano_hud_ax->value, nanoCrosshairDrawing ? 0.5f : nano_hud_ay->value);
+ 		if (!nanoCrosshairDrawing) { *x += floorf(nano_hud_dx->value*xscale + 0.5f); *y += floorf(nano_hud_dy->value*yscale + 0.5f); }
+ 	}
+@@ -447,7 +468,20 @@
+ 		return;
+ 	}
+ 
+-	int y = clgame.centerPrint.y; // start y
++if(Cvar_VariableValue("nano_hud_profile")) {
++        int flags=FONT_DRAW_HUD|FONT_DRAW_UTF8,height=14;
++        CL_DrawStringLen(font,"M",NULL,&height,flags);
++        int y=(refState.height-clgame.centerPrint.lines*height)/2;
++        const char *p=clgame.centerPrint.message;
++        for(int i=0;i<clgame.centerPrint.lines;i++,y+=height) {
++            int used=0;while(*p && *p!='\n' && used<MAX_LINELENGTH-1)line[used++]=*p++;
++            if(*p=='\n')++p;line[used]=0;
++            int width;CL_DrawStringLen(font,(char*)line,&width,NULL,flags);
++            CL_DrawString((refState.width-width)/2,y,(char*)line,g_color_table[7],font,flags);
++        }
++        return;
++    }
++    int y = clgame.centerPrint.y; // start y
+ 	byte *colorDefault = g_color_table[7];
+ 	char *pText = clgame.centerPrint.message;
+ 
+@@ -1698,7 +1732,13 @@
+ 	if( pscrinfo->iSize != clgame.scrInfo.iSize )
+ 		clgame.scrInfo.iSize = pscrinfo->iSize;
+ 
+-	// copy screeninfo out
++	// Refresh live text-size measurements from the original bitmap font.
++    if(Cvar_VariableValue("nano_hud_profile") && cls.creditsFont.valid) {
++        int target=Cvar_VariableValue("nano_hud_text_height");if(target<12 || target>18)target=14;
++        clgame.scrInfo.iCharHeight=target;
++        for(int i=0;i<256;i++)clgame.scrInfo.charWidths[i]=Q_rint(cls.creditsFont.charWidths[i]*(float)target/cls.creditsFont.charHeight);
++    }
++    // copy screeninfo out
+ 	memcpy( pscrinfo, &clgame.scrInfo, clgame.scrInfo.iSize );
+ 
+ 	return 1;
+@@ -1998,7 +2038,8 @@
+ {
+ 	cl_font_t *font = Con_GetFont( con_fontsize.value );
+ 
+-	if( height ) *height = font->charHeight;
++	CL_DrawStringLen(font,pText,length,height,FONT_DRAW_UTF8|FONT_DRAW_HUD);
++	return;
+ 	CL_DrawStringLen( font, pText, length, NULL, FONT_DRAW_UTF8 | FONT_DRAW_HUD );
+ }
+ 
+@@ -3993,6 +4034,7 @@
+ 	qboolean missed_exports = false;
+ 	qboolean try_internal_vgui_support = GI->internal_vgui_support;
+ 
++	Cvar_Get("nano_hud_text_height", "14", FCVAR_ARCHIVE, "Nano HUD text height in physical pixels");
+ 	nano_hud_profile = (cvar_t *)Cvar_Get("nano_hud_profile", "0", FCVAR_ARCHIVE, "Enable Nano HUD pixel alignment");
+ 	nano_hud_scale = (cvar_t *)Cvar_Get("nano_hud_element_scale", "1", 0, "Temporary HUD element scale");
+ 	nano_hud_ax = (cvar_t *)Cvar_Get("nano_hud_anchor_x", "0", 0, "HUD horizontal anchor");
+--- a/engine/client/cl_font.c
++++ b/engine/client/cl_font.c
+@@ -189,6 +189,22 @@
+ 	return stop;
+ }
+ 
++
++// Normalize only client HUD fonts; console/menu rendering keeps its own metrics.
++static int NanoHudFontHeight(cl_font_t *font,int flags)
++{
++    if(FBitSet(flags,FONT_DRAW_HUD) && Cvar_VariableValue("nano_hud_profile")) {
++        int height=Cvar_VariableValue("nano_hud_text_height");
++        return height>=12 && height<=18 ? height : 14;
++    }
++    return font->charHeight;
++}
++static int NanoHudFontWidth(cl_font_t *font,int number,int flags)
++{
++    float scale=font->charHeight ? (float)NanoHudFontHeight(font,flags)/font->charHeight : 1;
++    return Q_rint(font->charWidths[number&255]*scale);
++}
++
+ int CL_DrawCharacter( float x, float y, int number, const rgba_t color, cl_font_t *font, int flags )
+ {
+ 	if( !font || !font->valid || y < -font->charHeight )
+@@ -198,7 +214,7 @@
+ 	if( number <= 32 )
+ 	{
+ 		if( number == ' ' )
+-			return font->charWidths[' '];
++			return NanoHudFontWidth(font,' ',flags);
+ 		else if( number == '\t' )
+ 			return CL_CalcTabStop( font, x );
+ 		return 0;
+@@ -214,7 +230,7 @@
+ 	int texw, texh;
+ 	R_GetTextureParms( &texw, &texh, font->hFontTexture );
+ 	if( !texw || !texh )
+-		return font->charWidths[number];
++		return NanoHudFontWidth(font,number,flags);
+ 
+ 	wrect_t *rc = &font->fontRc[number];
+ 	float half = 0.5f;
+@@ -226,8 +242,9 @@
+ 	float t1 = ((float)rc->top + half ) / texh;
+ 	float s2 = ((float)rc->right - half ) / texw;
+ 	float t2 = ((float)rc->bottom - half ) / texh;
+-	float w = ( rc->right - rc->left ) * font->scale;
+-	float h = ( rc->bottom - rc->top ) * font->scale;
++	float nanoScale=font->charHeight ? (float)NanoHudFontHeight(font,flags)/font->charHeight : 1;
++	float w = ( rc->right - rc->left ) * font->scale * nanoScale;
++	float h = ( rc->bottom - rc->top ) * font->scale * nanoScale;
+ 
+ 	if( FBitSet( flags, FONT_DRAW_HUD ))
+ 		SPR_AdjustSize( &x, &y, &w, &h );
+@@ -240,7 +257,7 @@
+ 
+ 	ref.dllFuncs.R_DrawStretchPic( x, y, w, h, s1, t1, s2, t2, font->hFontTexture );
+ 
+-	return font->charWidths[number];
++	return NanoHudFontWidth(font,number,flags);
+ }
+ 
+ int CL_DrawString( float x, float y, const char *s, const rgba_t color, cl_font_t *font, int flags )
+@@ -273,7 +290,7 @@
+ 			if( !FBitSet( flags, FONT_DRAW_NOLF ))
+ 			{
+ 				draw_len = 0;
+-				y += font->charHeight;
++				y += NanoHudFontHeight(font,flags);
+ 			}
+ 
+ 			if( FBitSet( flags, FONT_DRAW_RESETCOLORONLF ))
+@@ -332,7 +349,7 @@
+ 		return;
+ 
+ 	if( height )
+-		*height = font->charHeight;
++		*height = NanoHudFontHeight(font,flags);
+ 
+ 	if( width )
+ 		*width = 0;
+@@ -356,7 +373,7 @@
+ 			if( !FBitSet( flags, FONT_DRAW_NOLF ))
+ 			{
+ 				if( height )
+-					*height += font->charHeight;
++					*height += NanoHudFontHeight(font,flags);
+ 			}
+ 			continue;
+ 		}
+@@ -379,7 +396,7 @@
+ 
+ 		if( number )
+ 		{
+-			draw_len += font->charWidths[number];
++			draw_len += NanoHudFontWidth(font,number,flags);
+ 
+ 			if( width )
+ 			{
+--- a/engine/client/cl_scrn.c
++++ b/engine/client/cl_scrn.c
+@@ -740,10 +740,13 @@
+ 	// copy font size for client.dll
+ 	if( success )
+ 	{
+-		clgame.scrInfo.iCharHeight = cls.creditsFont.charHeight;
++		int target=Cvar_VariableValue("nano_hud_text_height");
++        qboolean nano=Cvar_VariableValue("nano_hud_profile")!=0;
++        if(target<12 || target>18)target=14;
++        clgame.scrInfo.iCharHeight = nano ? target : cls.creditsFont.charHeight;
+ 
+ 		for( int i = 0; i < ARRAYSIZE( cls.creditsFont.charWidths ); i++ )
+-			clgame.scrInfo.charWidths[i] = cls.creditsFont.charWidths[i];
++			clgame.scrInfo.charWidths[i] = nano ? Q_rint(cls.creditsFont.charWidths[i]*(float)target/cls.creditsFont.charHeight) : cls.creditsFont.charWidths[i];
+ 	}
+ 	else Con_DPrintf( S_ERROR "failed to load HUD font\n" );
+ }
+--- a/engine/platform/linux/in_evdev.c
++++ b/engine/platform/linux/in_evdev.c
+@@ -41,12 +41,13 @@
+ static CVAR_DEFINE_AUTO( evdev_keydebug, "0", 0, "print key events to console" );
+ 
+ static CVAR_DEFINE_AUTO( nano_control_scheme, "0", 0, "Nano controls: 0 original, 1 face-button aim" );
++static CVAR_DEFINE_AUTO( nano_scoreboard, "0", 0, "Nano scoreboard input context" );
+ static CVAR_DEFINE_AUTO( nano_text_menu, "0", 0, "CS text menu input context" );
+ static NanoControlState nanoControls = { 0, 0, 0, -1, 0 };
+ static int NanoControlContext(void)
+ {
+     if(cls.key_dest == key_game && cls.state == ca_active)
+-        return nano_text_menu.value ? 2 : 1;
++        return (nano_text_menu.value || nano_scoreboard.value) ? 2 : 1;
+     return 0;
+ }
+ static void NanoControlKey(int action,int down,void *opaque)
+@@ -484,6 +485,7 @@
+ {
+     Cvar_RegisterVariable(&nano_control_scheme);
+     Cvar_RegisterVariable(&nano_text_menu);
++    Cvar_RegisterVariable(&nano_scoreboard);
+ 	Cmd_AddRestrictedCommand ("evdev_open", Evdev_OpenDevice_f, "Open event device");
+ 	Cmd_AddRestrictedCommand ("evdev_close", Evdev_CloseDevice_f, "Close event device");
+ 	Cmd_AddRestrictedCommand ("evdev_autodetect", Evdev_Autodetect_f, "Automaticly open mouses and keyboards");

@@ -1,0 +1,564 @@
+--- a/BaseMenu.cpp
++++ b/BaseMenu.cpp
+@@ -20,6 +20,7 @@
+ 
+ */
+ #include "extdll_menu.h"
++#include "menus/nano-menu-theme.h"
+ #include "BaseMenu.h"
+ #include "PicButton.h"
+ #include "keydefs.h"
+@@ -623,6 +624,9 @@
+ 	if( !uiStatic.initialized )
+ 		return;
+ 
++    // Nano profile cvars arrive from the game config after UI_Init.
++    NanoThemeApply();
++
+ 	static bool loadStuff = true;
+ 
+ 	// can't do this in Init, since these are dependent on cvar values
+@@ -1008,6 +1012,17 @@
+ static void UI_LoadSounds( void )
+ {
+ 	memset( uiStatic.sounds, 0, sizeof( uiStatic.sounds ) );
++    if(NanoThemeEnabled()) {
++        const int choices[]={SND_MOVE,SND_LAUNCH,SND_OUT,SND_GLOW};
++        for(unsigned n=0;n<sizeof(choices)/sizeof(choices[0]);++n) {
++            int i=choices[n];const char *path=uiSounds[i];
++            if(NanoThemeCS())path=i==SND_MOVE?"sound/UI/buttonrollover.wav":"sound/UI/buttonclickrelease.wav";
++            if(path && EngFuncs::FileExists(path))Q_strncpy(uiStatic.sounds[i],path,sizeof(uiStatic.sounds[i]));
++            else if(path && !strncmp(path,uiSoundOldPrefix,strlen(uiSoundOldPrefix)))
++                snprintf(uiStatic.sounds[i],sizeof(uiStatic.sounds[i]),"%s%s",uiSoundNewPrefix,path+strlen(uiSoundOldPrefix));
++        }
++        return;
++    }
+ 
+ 	if ( uiStatic.lowmemory )
+ 		return;
+@@ -1193,6 +1208,8 @@
+ 
+ 	// trying to load colors.lst
+ 	UI_ApplyCustomColors ();
++    NanoThemeApply();
++
+ }
+ 
+ /*
+--- a/controls/BackgroundBitmap.cpp
++++ b/controls/BackgroundBitmap.cpp
+@@ -15,11 +15,27 @@
+ */
+ 
+ #include "extdll_menu.h"
++#include "../menus/nano-menu-theme.h"
+ #include "BaseMenu.h"
+ #include "BackgroundBitmap.h"
+ #include "Utils.h"
+ #include "BaseWindow.h"
+ 
++static CImage nanoBackground,nanoLogo;
++void NanoMenuDrawBackdrop(bool allowWorld)
++{
++    if(allowWorld && EngFuncs::ClientInGame() && EngFuncs::GetCvarFloat("ui_renderworld") && !EngFuncs::GetCvarFloat("cl_background")) {
++        UI_FillRect(0,0,ScreenWidth,ScreenHeight,0x8c000000u);return;
++    }
++    if(nanoBackground.IsValid())UI_DrawPic(0,0,ScreenWidth,ScreenHeight,uiColorWhite,nanoBackground);
++    else UI_FillRect(0,0,ScreenWidth,ScreenHeight,NanoThemePanel());
++}
++void NanoMenuDrawLogo()
++{
++    if(!nanoLogo.IsValid())return;
++    int width=EngFuncs::PIC_Width(nanoLogo.Handle()),height=EngFuncs::PIC_Height(nanoLogo.Handle());
++    UI_DrawPic(14,NanoThemeCS()?ScreenHeight-height-10:14,width,height,uiColorWhite,nanoLogo,QM_DRAWTRANS);
++}
+ bool CMenuBackgroundBitmap::s_bEnableLogoMovie = false;
+ bool CMenuBackgroundBitmap::s_bGameHasSteamBackground = false;
+ bool CMenuBackgroundBitmap::s_bGameHasWONBackground = false;
+@@ -110,6 +126,7 @@
+ 		return;
+ 	}
+ 
++    if(NanoThemeEnabled()){NanoMenuDrawBackdrop(true);return;}
+ 	if( EngFuncs::ClientInGame() )
+ 	{
+ 		if( EngFuncs::GetCvarFloat( "cl_background" ) )
+@@ -358,6 +375,13 @@
+ 	s_bGameHasSteamBackground = false;
+ 	s_bGameHasWONBackground = false;
+ 
++    nanoBackground.Reset();nanoLogo.Reset();
++    if(NanoThemeEnabled()) {
++        if(EngFuncs::FileExists("gfx/nano/menu_background.tga",true))nanoBackground.Load("gfx/nano/menu_background.tga",PIC_NOFLIP_TGA);
++        if(EngFuncs::FileExists("gfx/nano/menu_logo.tga",true))nanoLogo.Load("gfx/nano/menu_logo.tga",PIC_NOFLIP_TGA);
++        // Two bounded textures replace the full desktop / HD tile set.
++        return;
++    }
+ 	if( uiStatic.lowmemory )
+ 		return;
+ 
+--- a/controls/BaseItem.cpp
++++ b/controls/BaseItem.cpp
+@@ -103,7 +103,7 @@
+     static HFont cached[2]={0,0};static CBaseFont *objects[2]={NULL,NULL};
+     int slot=pixels==14?1:0;pixels=slot?14:12;
+     if(!objects[slot] || g_FontMgr->GetIFontFromHandle(cached[slot])!=objects[slot]) {
+-        cached[slot]=CFontBuilder("Trebuchet MS",pixels,500).Create();objects[slot]=g_FontMgr->GetIFontFromHandle(cached[slot]);
++        cached[slot]=CFontBuilder("Tahoma",pixels,500).Create();objects[slot]=g_FontMgr->GetIFontFromHandle(cached[slot]);
+     }
+     nanoFontPixels=pixels; font=cached[slot];charSize=(int)ceilf(pixels/uiStatic.scaleY);CalcSizes();
+ }
+--- a/controls/CheckBox.cpp
++++ b/controls/CheckBox.cpp
+@@ -15,6 +15,7 @@
+ */
+ 
+ #include "extdll_menu.h"
++#include "../menus/nano-menu-theme.h"
+ #include "BaseMenu.h"
+ #include "CheckBox.h"
+ #include "Utils.h"
+@@ -112,7 +113,7 @@
+ {
+ 	uint textflags = ( iFlags & QMF_DROPSHADOW ? ETF_SHADOW : 0 ) | ETF_NOSIZELIMIT | ETF_FORCECOL;
+ 
+-	UI_DrawString( font, m_scTextPos, m_scTextSize, szName, colorText, m_scChSize, eTextAlignment, textflags );
++	UI_DrawString( font, m_scTextPos, m_scTextSize, szName, NanoThemeEnabled()?(iFlags&QMF_GRAYED?uiColorHelp:IsCurrentSelected()?uiPromptFocusColor:uiPromptTextColor):(unsigned)colorText, m_scChSize, eTextAlignment, textflags );
+ 
+ 	if( szStatusText && iFlags & QMF_NOTIFY )
+ 	{
+@@ -132,6 +133,17 @@
+ 		EngFuncs::DrawConsoleString( coord, szStatusText );
+ 	}
+ 
++    if(NanoThemeEnabled()) {
++        NanoThemeBevel(m_scPos.x,m_scPos.y,m_scSize.w,m_scSize.h,NanoThemeField(),true);
++        if(IsCurrentSelected())UI_DrawRectangleExt(m_scPos,m_scSize,uiPromptFocusColor,1);
++        if(bChecked){
++            unsigned ink=(iFlags&QMF_GRAYED)?uiColorHelp:IsCurrentSelected()?uiPromptFocusColor:uiPromptTextColor;
++            int x=m_scPos.x+3,y=m_scPos.y+6;
++            for(int i=0;i<3;++i)UI_FillRect(x+i,y+i,1,2,ink);
++            for(int i=0;i<6;++i)UI_FillRect(x+2+i,y+2-i,1,2,ink);
++        }
++        return;
++    }
+ 	if( iFlags & QMF_GRAYED )
+ 	{
+ 		UI_DrawPic( m_scPos, m_scSize, uiColorWhite, szGrayedPic );
+--- a/controls/DropDown.cpp
++++ b/controls/DropDown.cpp
+@@ -20,6 +20,7 @@
+ 
+ #include "BaseMenu.h"
+ #include "DropDown.h"
++#include "../menus/nano-menu-theme.h"
+ #include "../menus/nano-menu-layout.h"
+ 
+ CMenuDropDown::CMenuDropDown() : BaseClass()
+@@ -168,6 +169,18 @@
+ 	if( iFlags & QMF_DROPSHADOW )
+ 		textflags |= ETF_SHADOW;
+ 
++    if(NanoThemeEnabled()) {
++        UI_DrawString(font,m_scPos.x,m_scPos.y-m_scChSize*1.5f,m_scSize.w,m_scChSize,szName,uiColorHelp,m_scChSize,QM_LEFT,textflags|ETF_FORCECOL);
++        NanoThemeBevel(m_scPos.x,m_scPos.y,m_scSize.w,m_scSize.h,NanoThemeField(),true);
++        const char *value=m_iState>=0 && m_iState<m_szNames.Count()?m_szNames[m_iState]:"";
++        char fitted[256];NanoMenuFit(font,value,fitted,sizeof(fitted),m_scSize.w-32,m_scChSize);
++        UI_DrawString(font,m_scPos.x+6,m_scPos.y,m_scSize.w-32,m_scSize.h,fitted,
++            (iFlags&QMF_GRAYED)?uiColorHelp:IsCurrentSelected()?uiPromptFocusColor:uiPromptTextColor,m_scChSize,QM_LEFT,textflags|ETF_FORCECOL);
++        int x=m_scPos.x+m_scSize.w-20;
++        NanoThemeBevel(x,m_scPos.y+1,18,m_scSize.h-2,NanoThemePanel());
++        UI_DrawString(font,x,m_scPos.y+1,18,m_scSize.h-2,"v",uiPromptTextColor,m_scChSize,QM_CENTER,ETF_FORCECOL);
++        return;
++    }
+ 	if( m_isOpen )
+ 	{
+ 		Point pt( m_scPos.x, m_scPos.y );
+--- a/controls/Field.cpp
++++ b/controls/Field.cpp
+@@ -15,6 +15,7 @@
+ */
+ 
+ #include "extdll_menu.h"
++#include "../menus/nano-menu-theme.h"
+ #include "BaseMenu.h"
+ #include "Field.h"
+ #include "../menus/nano-menu-layout.h"
+@@ -460,7 +461,8 @@
+ 		UI_FillRect( newPos, m_scSize, uiInputBgColor );
+ 
+ 		// draw the rectangle
+-		UI_DrawRectangle( newPos, m_scSize, uiInputFgColor );
++        if(NanoThemeEnabled())NanoThemeBevel(newPos.x,newPos.y,m_scSize.w,m_scSize.h,NanoThemeField(),true);
++        else UI_DrawRectangle( newPos, m_scSize, uiInputFgColor );
+ 	}
+ 
+ 	textHeight = y - (m_scChSize * 1.5f);
+--- a/controls/Framework.cpp
++++ b/controls/Framework.cpp
+@@ -13,6 +13,7 @@
+ GNU General Public License for more details.
+ */
+ #include "Framework.h"
++#include "../menus/nano-menu-theme.h"
+ #include "PicButton.h"
+ #include "Slider.h"
+ #include "SpinControl.h"
+@@ -57,7 +58,13 @@
+ 	static CMenuBaseItem *lastItem;
+ 	CMenuBaseItem *item;
+ 
+-	NanoArrangeSettings();
++    NanoArrangeSettings();
++    if(NanoSettingsActive()) {
++        NanoThemeBevel(4,4,ScreenWidth-8,ScreenHeight-8,NanoThemePanel());
++        SetNanoFont(14);
++        UI_DrawString(font,12,12,ScreenWidth-24,20,NanoThemeTitle(szName),uiPromptTextColor,14,QM_LEFT,ETF_FORCECOL|ETF_SHADOW);
++        UI_FillRect(12,32,ScreenWidth-24,1,NanoThemeDark());
++    } else if(NanoThemeEnabled())NanoMenuDrawLogo();
+ 	BaseClass::Draw();
+ 	if(NanoMenuEnabled())return;
+ 
+@@ -286,5 +293,5 @@
+     SetCoord(0,0);
+     SetSize((int)ceilf(ScreenWidth/uiStatic.scaleX),(int)ceilf(ScreenHeight/uiStatic.scaleY));
+     CalcPosition();CalcSizes();banner.Hide();DisableTransition();
+-    NanoMenuArrangeRows(*this,ScreenWidth,ScreenHeight,nanoScroll,8,&banner);
+-}
++    NanoMenuArrangeRows(*this,ScreenWidth,ScreenHeight,nanoScroll,8,&banner,36);
++}
+--- a/controls/PicButton.cpp
++++ b/controls/PicButton.cpp
+@@ -15,6 +15,7 @@
+ */
+ 
+ #include "extdll_menu.h"
++#include "../menus/nano-menu-theme.h"
+ #include "BaseMenu.h"
+ #include "Bitmap.h"
+ #include "PicButton.h"
+@@ -252,8 +253,14 @@
+ {
+ 	const bool native=NanoMenuEnabled();
+     if(native)SetNanoFont(nanoFontPixels);
+-    if(native && IsCurrentSelected() && !(iFlags&QMF_GRAYED)) {
+-        EngFuncs::FillRGBA(m_scPos.x-2,m_scPos.y,m_scSize.w+4,m_scSize.h,64,49,12,180);
++    if(native) {
++        bool main=m_pParent && !strcmp(m_pParent->szName,"CMenuMain");
++        bool selected=IsCurrentSelected();
++        unsigned colour=(iFlags&QMF_GRAYED)?uiColorHelp:selected?uiPromptFocusColor:main && NanoThemeCS()?0xffeeeeeeu:uiPromptTextColor;
++        Point text=m_scPos;Size area=m_scSize;
++        if(!main){NanoThemeBevel(text.x,text.y,area.w,area.h,NanoThemePanel(),m_bPressed);text.x+=6;area.w-=12;}
++        UI_DrawString(font,text,area,szName,colour,m_scChSize,eTextAlignment,ETF_FORCECOL|ETF_SHADOW);
++        return;
+     }
+     int state = BUTTON_NOFOCUS;
+ 
+--- a/controls/ProgressBar.cpp
++++ b/controls/ProgressBar.cpp
+@@ -14,6 +14,7 @@
+ */
+ 
+ #include "extdll_menu.h"
++#include "../menus/nano-menu-theme.h"
+ #include "BaseMenu.h"
+ #include "ProgressBar.h"
+ 
+@@ -55,6 +56,11 @@
+ 		flProgress = m_flValue;
+ 	}
+ 
++    if(NanoThemeEnabled()) {
++        UI_FillRect(m_scPos,m_scSize,NanoThemeField());
++        UI_FillRect(m_scPos.x+2,m_scPos.y+2,Q_max(0,(int)((m_scSize.w-4)*flProgress)),Q_max(0,m_scSize.h-4),NanoThemeAccent());
++        return;
++    }
+ 	// draw the background
+ 	UI_FillRect( m_scPos, m_scSize, uiInputBgColor );
+ 
+--- a/controls/Slider.cpp
++++ b/controls/Slider.cpp
+@@ -15,6 +15,7 @@
+ */
+ 
+ #include "extdll_menu.h"
++#include "../menus/nano-menu-theme.h"
+ #include "BaseMenu.h"
+ #include "Slider.h"
+ #include "Utils.h"
+@@ -196,6 +197,16 @@
+ 		* ( m_scSize.w - m_iSliderOutlineWidth - (m_scCenterBox.w) );
+ 
+ 
++    if(NanoThemeEnabled()) {
++        int width=10,x=m_scPos.x;
++        if(m_flMaxValue>m_flMinValue)x+=(m_scSize.w-width)*(m_flCurValue-m_flMinValue)/(m_flMaxValue-m_flMinValue);
++        NanoThemeBevel(m_scPos.x,m_scPos.y+6,m_scSize.w,6,NanoThemeField(),true);
++        NanoThemeBevel(x,m_scPos.y,width,m_scSize.h,NanoThemePanel());
++        if(IsCurrentSelected())UI_FillRect(x+3,m_scPos.y+3,4,1,uiPromptFocusColor);
++        int y=m_scPos.y-(m_scChSize*1.5f);
++        UI_DrawString(font,m_scPos.x,y,m_scSize.w,m_scChSize,szName,uiPromptTextColor,m_scChSize,eTextAlignment,textflags|ETF_FORCECOL);
++        return;
++    }
+ 	UI_DrawRectangleExt( m_scPos.x + m_iSliderOutlineWidth / 2, m_scPos.y + m_iSliderOutlineWidth, m_scSize.w - m_iSliderOutlineWidth, m_scCenterBox.h, uiInputBgColor, m_iSliderOutlineWidth );
+ 	if( eFocusAnimation == QM_HIGHLIGHTIFFOCUS && this == m_pParent->ItemAtCursor())
+ 		UI_DrawPic( sliderX, m_scPos.y, m_scCenterBox.w, m_scSize.h, uiColorHelp, imgSlider );
+--- a/controls/SpinControl.cpp
++++ b/controls/SpinControl.cpp
+@@ -15,8 +15,10 @@
+ */
+ 
+ #include "extdll_menu.h"
++#include "../menus/nano-menu-theme.h"
+ #include "BaseMenu.h"
+ #include "SpinControl.h"
++#include "../menus/nano-menu-layout.h"
+ #include "Utils.h"
+ #include "Scissor.h"
+ 
+@@ -144,6 +146,18 @@
+ 	int textHeight = m_scPos.y - (m_scChSize * 1.5f);
+ 	UI_DrawString( font, m_scPos.x - UI_OUTLINE_WIDTH, textHeight, m_scSize.w + UI_OUTLINE_WIDTH * 2, m_scChSize, szName, uiColorHelp, m_scChSize, QM_LEFT, textflags | ETF_FORCECOL | ETF_NOSIZELIMIT );
+ 
++    if(NanoThemeEnabled()) {
++        NanoThemeBevel(m_scPos.x,m_scPos.y,m_scSize.w,m_scSize.h,NanoThemeField(),true);
++        char fitted[256];NanoMenuFit(font,m_szDisplay,fitted,sizeof(fitted),m_scSize.w-50,m_scChSize);
++        UI_DrawString(font,m_scPos.x+6,m_scPos.y,m_scSize.w-50,m_scSize.h,fitted,
++            (iFlags&QMF_GRAYED)?uiColorHelp:IsCurrentSelected()?uiPromptFocusColor:uiPromptTextColor,m_scChSize,QM_LEFT,textflags|ETF_FORCECOL);
++        for(int direction=0;direction<2;++direction){
++            int x=m_scPos.x+m_scSize.w-38+direction*18;
++            NanoThemeBevel(x,m_scPos.y+1,18,m_scSize.h-2,NanoThemePanel());
++            UI_DrawString(font,x,m_scPos.y+1,18,m_scSize.h-2,direction?">":"<",uiPromptTextColor,m_scChSize,QM_CENTER,ETF_FORCECOL);
++        }
++        return;
++    }
+ 	// calculate size and position for the arrows
+ 	arrow.w = m_scSize.h + UI_OUTLINE_WIDTH * 2;
+ 	arrow.h = m_scSize.h + UI_OUTLINE_WIDTH * 2;
+--- a/controls/TabView.cpp
++++ b/controls/TabView.cpp
+@@ -13,6 +13,7 @@
+ GNU General Public License for more details.
+ */
+ #include "TabView.h"
++#include "../menus/nano-menu-theme.h"
+ #include "Scissor.h"
+ #include "../menus/nano-menu-layout.h"
+ 
+@@ -60,6 +61,10 @@
+ 		textColor = uiPromptFocusColor;
+ 	}
+ 
++    if(NanoThemeEnabled()) {
++        NanoThemeBevel(pt.x,pt.y,m_szTab.w,m_szTab.h,NanoThemePanel(),!isSelected);
++        UI_DrawString(font,pt,m_szTab,name,isHighlighted?uiPromptFocusColor:uiPromptTextColor,m_scChSize,eTextAlignment,textflags|ETF_FORCECOL);return;
++    }
+ 	UI_FillRect( pt, m_szTab, fillColor );
+ 	UI_DrawString( font, pt, m_szTab, name, textColor, m_scChSize, eTextAlignment, textflags );
+ 
+@@ -106,7 +111,7 @@
+ 		m_scSize.w, UI_OUTLINE_WIDTH, uiColorHelp );
+ 
+ 	// fill background
+-	UI_FillRect( contentOffset, contentSize, uiColorBlack );
++	UI_FillRect(contentOffset,contentSize,NanoThemeEnabled()?NanoThemePanel():uiColorBlack);
+ 
+ 	// draw contents
+ 	if( m_iCursor >= 0 && m_iCursor < m_pItems.Count() )
+--- a/controls/Table.cpp
++++ b/controls/Table.cpp
+@@ -17,6 +17,7 @@
+ #include "extdll_menu.h"
+ #include "BaseMenu.h"
+ #include "Table.h"
++#include "../menus/nano-menu-theme.h"
+ #include "Utils.h"
+ #include "Scissor.h"
+ #include "../menus/nano-menu-layout.h"
+@@ -612,6 +613,23 @@
+ 	int i, y;
+ 	int selColor = PackRGB( 80, 56, 24 );
+ 	int upFocus, downFocus, scrollbarFocus;
++    if(NanoThemeEnabled()) {
++        int count=m_pModel->GetRows();iNumRows=Q_max(1,(m_scSize.h-24)/24);
++        iCurItem=bound(0,iCurItem,Q_max(0,count-1));
++        if(iCurItem<iTopItem)iTopItem=iCurItem;
++        if(iCurItem>=iTopItem+iNumRows)iTopItem=iCurItem-iNumRows+1;
++        iTopItem=bound(0,iTopItem,Q_max(0,count-iNumRows));
++        headerSize=Size(m_scSize.w,24);boxPos=Point(m_scPos.x,m_scPos.y+24);boxSize=Size(m_scSize.w,Q_max(0,m_scSize.h-24));
++        NanoThemeBevel(m_scPos.x,m_scPos.y,m_scSize.w,m_scSize.h,NanoThemeField(),true);
++        DrawLine(m_scPos,szHeaderTexts,Q_min(m_pModel->GetColumns(),MAX_TABLE_COLUMNS),uiPromptTextColor,true);
++        UI_FillRect(m_scPos.x+1,m_scPos.y+23,m_scSize.w-2,1,NanoThemeDark());
++        UI::Scissor::PushScissor(boxPos,boxSize);
++        for(int row=iTopItem,y=boxPos.y;row<count && row<iTopItem+iNumRows;++row,y+=24) {
++            bool selected=row==iCurItem && !(iFlags&QMF_INACTIVE);
++            DrawLine(Point(boxPos.x+3,y),row,(iFlags&QMF_GRAYED)?uiColorHelp:selected?uiPromptFocusColor:uiPromptTextColor,true,0);
++        }
++        UI::Scissor::PopScissor();return;
++    }
+ 
+ 	// HACKHACK: recalc iNumRows, to be not greater than iNumItems
+ 	iNumRows = ( m_scSize.h - iStrokeWidth * 2 ) / (NanoMenuEnabled()?24:m_scChSize) - 1;
+--- a/controls/YesNoMessageBox.cpp
++++ b/controls/YesNoMessageBox.cpp
+@@ -14,6 +14,7 @@
+ */
+ 
+ #include "extdll_menu.h"
++#include "../menus/nano-menu-theme.h"
+ #include "BaseMenu.h"
+ #include "Action.h"
+ #include "PicButton.h"
+@@ -125,11 +126,12 @@
+     NanoArrangeDialog();
+ 	UI_FillRect( 0, 0, gpGlobals->scrWidth, gpGlobals->scrHeight, 0x40000000 );
+ 
+-	EngFuncs::FillRGBA( m_scPos.x, m_scPos.y, m_scSize.w, m_scSize.h, 20,20,20,NanoMenuEnabled()?255:235 );
++    if(NanoThemeEnabled())NanoThemeBevel(m_scPos.x,m_scPos.y,m_scSize.w,m_scSize.h,NanoThemePanel());
++    else EngFuncs::FillRGBA(m_scPos.x,m_scPos.y,m_scSize.w,m_scSize.h,20,20,20,235);
+ 	UI_DrawRectangle( m_scPos, m_scSize, uiInputFgColor );
+ 
+ 	if(NanoMenuEnabled()) {
+-        UI::Scissor::PushScissor(Point(12,12),Size(ScreenWidth-24,ScreenHeight-56));dlgMessage1.Draw();UI::Scissor::PopScissor();
++        UI::Scissor::PushScissor(dlgMessage1.GetRenderPosition(),dlgMessage1.GetRenderSize());dlgMessage1.Draw();UI::Scissor::PopScissor();
+         yes.Draw();if(!m_bIsAlert)no.Draw();
+     } else CMenuBaseWindow::Draw();
+ }
+@@ -141,7 +143,7 @@
+ */
+ bool CMenuYesNoMessageBox::KeyDown( int key )
+ {
+-	if( UI::Key::IsEscape( key ) )
++	if( UI::Key::IsEscape( key ) || (NanoMenuEnabled() && key==K_SPACE) )
+ 	{
+ 		Hide();
+ 		onNegative( this );
+@@ -288,20 +290,21 @@
+ void CMenuYesNoMessageBox::NanoArrangeDialog()
+ {
+     if(!NanoMenuEnabled())return;
+-    SetRect(0,0,(int)ceilf(ScreenWidth/uiStatic.scaleX),(int)ceilf(ScreenHeight/uiStatic.scaleY));CalcPosition();CalcSizes();
+     dlgMessage1.SetNanoFont(14);
+     if((uintptr_t)dlgMessage1.szName<(uintptr_t)nanoMessage || (uintptr_t)dlgMessage1.szName>=(uintptr_t)nanoMessage+sizeof(nanoMessage))dlgMessage1.nanoLabelSource=dlgMessage1.szName;
+-    NanoMenuWrap(dlgMessage1.font,dlgMessage1.nanoLabelSource,nanoMessage,sizeof(nanoMessage),ScreenWidth-24,14);
+-    // The message action wraps inside a full-width native rectangle.
++    NanoMenuWrap(dlgMessage1.font,dlgMessage1.nanoLabelSource,nanoMessage,sizeof(nanoMessage),ScreenWidth-44,14);
+     int lines=1;for(const char *p=nanoMessage;*p;p++)if(*p=='\n')++lines;
+-    int visible=(ScreenHeight-56)/16;
++    int visible=Q_max(1,Q_min(lines,(ScreenHeight-80)/16));
++    int height=Q_max(112,visible*16+60),top=(ScreenHeight-height)/2;
++    SetRect((int)ceilf(10/uiStatic.scaleX),(int)ceilf(top/uiStatic.scaleY),
++        (int)ceilf((ScreenWidth-20)/uiStatic.scaleX),(int)ceilf(height/uiStatic.scaleY));CalcPosition();CalcSizes();
+     nanoMessageScroll=bound(0,nanoMessageScroll,Q_max(0,lines-visible));
+     const char *text=nanoMessage;
+     for(int row=0;row<nanoMessageScroll && *text;row++){while(*text && *text!='\n')++text;if(*text)++text;}
+     dlgMessage1.szName=text;dlgMessage1.eTextAlignment=QM_TOP;
+-    NanoMenuRect(dlgMessage1,12,12,ScreenWidth-24,ScreenHeight-56);
++    // Coordinates are relative to this compact dialog, not the root viewport.
++    NanoMenuRect(dlgMessage1,10,12,ScreenWidth-40,visible*16);
++    NanoMenuRect(yes,m_bIsAlert?(ScreenWidth-100)/2:ScreenWidth/2-2,height-36,80,24);
++    if(!m_bIsAlert)NanoMenuRect(no,ScreenWidth/2-98,height-36,80,24);
+     dlgMessage1.SetNanoFont(14);yes.SetNanoFont(14);no.SetNanoFont(14);
+-    NanoMenuRect(yes,m_bIsAlert?64:12,ScreenHeight-36,m_bIsAlert?112:100,24);
+-    if(!m_bIsAlert)NanoMenuRect(no,128,ScreenHeight-36,100,24);
+-    yes.SetNanoFont(14);no.SetNanoFont(14);
+-}
++}
+--- a/menus/ConnectionProgress.cpp
++++ b/menus/ConnectionProgress.cpp
+@@ -18,6 +18,7 @@
+ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ */
+ #include "extdll_menu.h"
++#include "../menus/nano-menu-theme.h"
+ #include "BaseMenu.h"
+ #include "Utils.h"
+ 
+@@ -334,16 +335,18 @@
+ 	}
+     if(NanoMenuEnabled()) {
+         SetRect(0,0,(int)ceilf(ScreenWidth/uiStatic.scaleX),(int)ceilf(ScreenHeight/uiStatic.scaleY));CalcPosition();CalcSizes();DisableTransition();
+-        EngFuncs::FillRGBA(0,0,ScreenWidth,ScreenHeight,20,20,20,255);
++        NanoMenuDrawBackdrop();
++        NanoThemeBevel(8,44,ScreenWidth-16,152,NanoThemePanel());
+         title.SetNanoFont(14);commonText.SetNanoFont(14);downloadText.SetNanoFont(12);
+-        NanoMenuWrap(title.font,sTitleString,title.nanoLabel,sizeof(title.nanoLabel),ScreenWidth-24,14);title.szName=title.nanoLabel;
++        NanoMenuWrap(title.font,sTitleString,title.nanoLabel,sizeof(title.nanoLabel),ScreenWidth-32,14);title.szName=title.nanoLabel;
+         const char *status=strcmp(sTitleString,sCommonString)?sCommonString:"Loading map and resources";
+-        NanoMenuWrap(commonText.font,status,commonText.nanoLabel,sizeof(commonText.nanoLabel),ScreenWidth-24,14);commonText.szName=commonText.nanoLabel;
+-        NanoMenuWrap(downloadText.font,sDownloadString,downloadText.nanoLabel,sizeof(downloadText.nanoLabel),ScreenWidth-24,12);downloadText.szName=downloadText.nanoLabel;
+-        NanoMenuRect(title,12,32,ScreenWidth-24,48);title.SetNanoFont(14);title.Draw();
+-        NanoMenuRect(commonText,12,88,ScreenWidth-24,64);commonText.SetNanoFont(14);commonText.Draw();
+-        NanoMenuRect(commonProgress,12,160,ScreenWidth-24,12);commonProgress.Draw();
+-        if(m_iState==STATE_DOWNLOAD){NanoMenuRect(downloadText,12,180,ScreenWidth-24,48);downloadText.SetNanoFont(12);downloadText.Draw();}
++        NanoMenuWrap(commonText.font,status,commonText.nanoLabel,sizeof(commonText.nanoLabel),ScreenWidth-32,14);commonText.szName=commonText.nanoLabel;
++        NanoMenuWrap(downloadText.font,sDownloadString,downloadText.nanoLabel,sizeof(downloadText.nanoLabel),ScreenWidth-32,12);downloadText.szName=downloadText.nanoLabel;
++        NanoMenuRect(title,16,54,ScreenWidth-32,48);title.SetNanoFont(14);title.Draw();
++        NanoMenuRect(commonText,16,106,ScreenWidth-32,48);commonText.SetNanoFont(14);commonText.Draw();
++        NanoMenuRect(commonProgress,16,164,ScreenWidth-32,12);commonProgress.Draw();
++        if(m_iState==STATE_DOWNLOAD){NanoMenuRect(downloadText,16,184,ScreenWidth-32,40);downloadText.SetNanoFont(12);downloadText.Draw();}
++        NanoMenuDrawLogo();
+         return;
+     }
+ 	UI_FillRect( 0,0, gpGlobals->scrWidth, gpGlobals->scrHeight, m_iState == STATE_NONE ? 0xFF000000 : 0x40000000 );
+--- a/menus/Main.cpp
++++ b/menus/Main.cpp
+@@ -20,6 +20,7 @@
+ 
+ 
+ #include "Framework.h"
++#include "../menus/nano-menu-theme.h"
+ #include "Action.h"
+ #include "Bitmap.h"
+ #include "PicButton.h"
+@@ -412,7 +413,8 @@
+ 
+ void CMenuMain::NanoArrange(bool style)
+ {
+-    // Native Nano profile: original button images/font, larger readable rows.
++    (void)style;
++    // Native text uses the shared 14-pixel game font and focus-scrolled rows.
+     CMenuPicButton *rows[] = { &console, &disconnect, &resumeGame, &newGame,
+         &hazardCourse, &configuration, &saveRestore, &multiPlayer,
+         &customGame, &readme, &previews, &nanoSpectator, &quit };
+@@ -423,8 +425,9 @@
+     customGame.SetVisibility(!nano);previews.SetVisibility(!nano);readme.SetVisibility(!nano);
+     nanoSpectator.SetVisibility(nano && CL_IsActive() && EngFuncs::GetCvarFloat("nano_observing"));
+     if (nano && !stricmp(gMenu.m_gameinfo.gamefolder,"cstrike")) {
+-        multiPlayer.SetNameAndStatus("Offline match", "Choose map, bots and difficulty");
+-        multiPlayer.onReleased = UI_NanoMatch_Menu;
++        newGame.SetVisibility(true);newGame.SetGrayed(!EngFuncs::CheckGameDll());
++        newGame.SetNameAndStatus("New Game", "Choose map, bots and difficulty");
++        newGame.onReleased=UI_NanoMatch_Menu;multiPlayer.SetVisibility(false);
+         saveRestore.SetVisibility(false);
+         hazardCourse.SetVisibility(false);
+     } else {
+@@ -446,7 +449,6 @@
+     for(unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);++i) {
+         CMenuPicButton *item=rows[i];heights[i]=0;tops[i]=total;
+         if(item->Parent()!=this || !item->IsVisible())continue;
+-        if(style)item->SetNanoScale(2.3f);
+         item->SetNanoFont(14);
+         if(item->szName!=item->nanoLabel)item->nanoLabelSource=item->szName;
+         NanoMenuWrap(item->font,item->nanoLabelSource,item->nanoLabel,sizeof(item->nanoLabel),ScreenWidth-24,14);
+@@ -455,14 +457,17 @@
+         heights[i]=h;total+=h;
+         if(item==ItemAtCursor()){focusTop=tops[i];focusHeight=h;}
+     }
+-    int viewport=ScreenHeight-16;
++    const bool cs=!stricmp(gMenu.m_gameinfo.gamefolder,"cstrike");
++    int bottom=cs?38:8;
++    int top=cs?Q_max(38,ScreenHeight-bottom-total):total>ScreenHeight-62?38:54;
++    int viewport=Q_max(24,ScreenHeight-top-bottom);
+     if(focusTop>=0){if(focusTop<nanoScroll)nanoScroll=focusTop;
+         if(focusTop+focusHeight>nanoScroll+viewport)nanoScroll=focusTop+focusHeight-viewport;}
+     nanoScroll=bound(0,nanoScroll,Q_max(0,total-viewport));
+     for(unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);++i)if(heights[i]) {
+-        int y=8+tops[i]-nanoScroll;bool visible=y>=8 && y+heights[i]<=ScreenHeight-8;
++        int y=top+tops[i]-nanoScroll;bool visible=y>=top && y+heights[i]<=ScreenHeight-bottom;
+         if(visible)rows[i]->iFlags&=~QMF_HIDDENBYPARENT;else rows[i]->iFlags|=QMF_HIDDENBYPARENT;
+-        NanoMenuRect(*rows[i],12,visible?y:8,ScreenWidth-24,heights[i]-4);
++        NanoMenuRect(*rows[i],14,visible?y:top,ScreenWidth-28,heights[i]-4);
+         rows[i]->SetNanoFont(14);
+     }
+ 

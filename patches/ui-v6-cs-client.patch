@@ -1,0 +1,108 @@
+--- a/cl_dll/hud/spectator_gui.cpp
++++ b/cl_dll/hud/spectator_gui.cpp
+@@ -627,34 +627,78 @@
+ int CHudSpectatorGui::NanoDraw()
+ {
+     NanoHudScope scope(1.0f,0,0);
+-    int h=NanoHudTextHeight(),r=255,g=140,b=0;
+-    FillRGBABlend(0,0,ScreenWidth,2*h+12,0,0,0,153);
+-    char summary[128],map[128];
+-    snprintf(summary,sizeof(summary),"CT: %d   T: %d",label.m_iCounterTerrorists,label.m_iTerrorists);
+-    DrawUtils::DrawHudString(4,h+8,ScreenWidth-4,summary,r,g,b);
++    const int h=NanoHudTextHeight(),pad=6,band=2*h+14;
++    const int orangeR=255,orangeG=140,orangeB=0;
++    char ct[48],terrorists[48],text[128],map[128];
++    snprintf(ct,sizeof(ct),"CT: %d",label.m_iCounterTerrorists);
++    snprintf(terrorists,sizeof(terrorists),"T: %d",label.m_iTerrorists);
++    FillRGBABlend(0,0,ScreenWidth,band,0,0,0,185);
++    int third=(ScreenWidth-2*pad)/3;
++    NanoHudFit(ct,text,sizeof(text),third-4,NanoSpectatorWidth);
++    DrawUtils::DrawHudString(pad,5,pad+third-4,text,158,195,255);
+     const char *timer=m_bBombPlanted?"Bomb":label.m_szTimer;
+-    DrawUtils::DrawHudString((ScreenWidth-NanoSpectatorWidth(timer))/2,4,ScreenWidth-4,timer,r,g,b);
+-    NanoHudFit(label.m_szMap,map,sizeof(map),ScreenWidth-8,NanoSpectatorWidth);
+-    // Map remains available in the scoreboard; team scores occupy this row.
+-    FillRGBABlend(0,ScreenHeight-2*h-12,ScreenWidth,2*h+12,0,0,0,153);
++    NanoHudFit(timer,text,sizeof(text),third-4,NanoSpectatorWidth);
++    DrawUtils::DrawHudString((ScreenWidth-NanoSpectatorWidth(text))/2,5,ScreenWidth-pad,text,orangeR,orangeG,orangeB);
++    NanoHudFit(terrorists,text,sizeof(text),third-4,NanoSpectatorWidth);
++    DrawUtils::DrawHudString(ScreenWidth-pad-NanoSpectatorWidth(text),5,ScreenWidth-pad,text,255,160,140);
++    const bool automatic=gEngfuncs.pfnGetCvarFloat("spec_autodirector")!=0;
++    const char *director=automatic?"Auto":"";
++    NanoHudFit(label.m_szMap,map,sizeof(map),ScreenWidth-2*pad-NanoSpectatorWidth(director)-(automatic?8:0),NanoSpectatorWidth);
++    DrawUtils::DrawHudString(pad,h+9,ScreenWidth-pad,map,190,190,190);
++    if(automatic)DrawUtils::DrawHudString(ScreenWidth-pad-NanoSpectatorWidth(director),h+9,ScreenWidth-pad,director,orangeR,orangeG,orangeB);
++    FillRGBABlend(0,ScreenHeight-band,ScreenWidth,band,0,0,0,185);
++    const char *modes[]={"Spectating","Locked chase","Free chase","Free look","First person","Map overview","Map chase"};
++    const char *mode=modes[bound(0,g_iUser1,6)];
++    char name[128]="No player selected",health[48]="Health: --";
++    int r=orangeR,g=orangeG,b=orangeB;
+     if(g_iUser2>0 && g_iUser2<=MAX_PLAYERS) {
+         hud_player_info_t player;GetPlayerInfo(g_iUser2,&player);
+-        char name[128],health[32];NanoHudFit(player.name?player.name:"",name,sizeof(name),ScreenWidth-8,NanoSpectatorWidth);
++        NanoHudFit(player.name?player.name:"",name,sizeof(name),ScreenWidth-2*pad,NanoSpectatorWidth);
+         int value=g_PlayerExtraInfo[g_iUser2].sb_health>255?g_PlayerExtraInfo[g_iUser2].sb_health:g_PlayerExtraInfo[g_iUser2].health;
+-        snprintf(health,sizeof(health),"Health: %d",value);GetTeamColor(r,g,b,g_PlayerExtraInfo[g_iUser2].teamnumber);
+-        DrawUtils::DrawHudString(4,ScreenHeight-2*h-8,ScreenWidth-4,name,r,g,b);
+-        DrawUtils::DrawHudString(4,ScreenHeight-h-4,ScreenWidth-4,health,r,g,b);
++        snprintf(health,sizeof(health),"Health: %d",value);
++        GetTeamColor(r,g,b,g_PlayerExtraInfo[g_iUser2].teamnumber);
+     }
++    DrawUtils::DrawHudString(pad,ScreenHeight-band+5,ScreenWidth-pad,name,r,g,b);
++    NanoHudFit(health,text,sizeof(text),(ScreenWidth-2*pad)/2,NanoSpectatorWidth);
++    int healthWidth=NanoSpectatorWidth(text);
++    NanoHudFit(mode,map,sizeof(map),ScreenWidth-2*pad-healthWidth-8,NanoSpectatorWidth);
++    DrawUtils::DrawHudString(pad,ScreenHeight-h-5,ScreenWidth-pad-healthWidth-8,map,190,190,190);
++    DrawUtils::DrawHudString(ScreenWidth-pad-healthWidth,ScreenHeight-h-5,ScreenWidth-pad,text,r,g,b);
+     if(m_menuFlags&ROOT_MENU) {
+         gEngfuncs.Cvar_SetValue("nano_text_menu",1);
+         const char *names[8],*commands[8];int count=NanoEntries(names,commands);
+-        nanoCursor=bound(0,nanoCursor,count-1);int pitch=h+10,visible=(ScreenHeight-16)/pitch;
+-        int first=max(0,nanoCursor-visible+1);first=min(first,max(0,count-visible));
+-        FillRGBABlend(4,4,ScreenWidth-8,ScreenHeight-8,0,0,0,230);
+-        for(int row=first,y=8;row<count && row<first+visible;row++,y+=pitch) {
+-            if(row==nanoCursor)FillRGBABlend(8,y-2,ScreenWidth-16,pitch,90,60,0,180);
+-            DrawUtils::DrawHudString(12,y,ScreenWidth-12,names[row],commands[row][0]?255:100,commands[row][0]?140:100,commands[row][0]?0:100);
++        nanoCursor=bound(0,nanoCursor,count-1);
++        const int pitch=h+8,listTop=h+22,footer=ScreenHeight-h-14;
++        int visible=max(1,(footer-listTop-8)/pitch);
++        int first=min(max(0,nanoCursor-visible+1),max(0,count-visible));
++        FillRGBABlend(6,6,ScreenWidth-12,ScreenHeight-12,76,88,68,250);
++        FillRGBABlend(6,6,ScreenWidth-12,1,136,145,128,255);
++        FillRGBABlend(6,6,1,ScreenHeight-12,136,145,128,255);
++        FillRGBABlend(6,ScreenHeight-7,ScreenWidth-12,1,40,46,34,255);
++        FillRGBABlend(ScreenWidth-7,6,1,ScreenHeight-12,40,46,34,255);
++        const char *heading=(m_menuFlags&MENU_SPEC_OPTIONS)?"Camera mode":(m_menuFlags&MENU_OPTIONS_SETTINGS)?"Spectator settings":(m_menuFlags&MENU_OPTIONS)?"Spectator options":"Spectator";
++        NanoHudFit(heading,text,sizeof(text),ScreenWidth-28,NanoSpectatorWidth);
++        DrawUtils::DrawHudString(14,12,ScreenWidth-14,text,216,222,211);
++        FillRGBABlend(14,h+17,ScreenWidth-28,1,136,145,128,255);
++        for(int row=first,y=listTop;row<count && row<first+visible;row++,y+=pitch) {
++            bool enabled=commands[row][0]!=0,selected=row==nanoCursor;
++            const char *value=NULL;
++            if((m_menuFlags&MENU_OPTIONS_SETTINGS) && !(m_menuFlags&MENU_SPEC_OPTIONS) && row<4) {
++                const char *settings[]={"hud_saytext","spec_drawstatus","spec_drawcone","spec_drawnames"};
++                value=gEngfuncs.pfnGetCvarFloat(settings[row])?"On":"Off";
++            } else if((m_menuFlags&MENU_OPTIONS) && !(m_menuFlags&(MENU_SPEC_OPTIONS|MENU_OPTIONS_SETTINGS)) && row==1) {
++                value=automatic?"On":"Off";
++            }
++            int valueWidth=value?NanoSpectatorWidth(value)+12:0;
++            NanoHudFit(names[row],text,sizeof(text),ScreenWidth-34-valueWidth,NanoSpectatorWidth);
++            int tr=selected?196:(enabled?216:140),tg=selected?181:(enabled?222:148),tb=selected?80:(enabled?211:132);
++            if(selected)FillRGBABlend(13,y+2,2,max(1,h-4),196,181,80,255);
++            DrawUtils::DrawHudString(20,y,ScreenWidth-14-valueWidth,text,tr,tg,tb);
++            if(value)DrawUtils::DrawHudString(ScreenWidth-14-NanoSpectatorWidth(value),y,ScreenWidth-14,value,tr,tg,tb);
+         }
++        FillRGBABlend(14,footer-6,ScreenWidth-28,1,40,46,34,255);
++        NanoHudFit("A Select   B Back",text,sizeof(text),ScreenWidth-28,NanoSpectatorWidth);
++        DrawUtils::DrawHudString(14,footer,ScreenWidth-14,text,160,170,149);
+     }
+     return 1;
+ }
+@@ -664,6 +708,7 @@
+     if(key!=K_UPARROW && key!=K_DOWNARROW && key!=K_LEFTARROW && key!=K_RIGHTARROW && key!=K_ENTER && key!=K_BACKSPACE)return 0;
+     if(!down)return 1;
+     const char *names[8],*commands[8];int count=NanoEntries(names,commands);
++    nanoCursor=bound(0,nanoCursor,count-1);
+     if(key==K_BACKSPACE) {
+         if(m_menuFlags&MENU_SPEC_OPTIONS)UserCmd_ToggleSpectatorMenuSpectateOptions();
+         else if(m_menuFlags&MENU_OPTIONS_SETTINGS)UserCmd_ToggleSpectatorMenuOptionsSettings();

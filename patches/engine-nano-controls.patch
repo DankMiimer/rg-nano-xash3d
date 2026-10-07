@@ -1,0 +1,92 @@
+--- a/engine/platform/linux/in_evdev.c
++++ b/engine/platform/linux/in_evdev.c
+@@ -19,6 +19,7 @@
+ #include "common.h"
+ #include "input.h"
+ #include "client.h"
++#include "nano-controls.h"
+ #include <fcntl.h>
+ #include <errno.h>
+ #include <linux/input.h>
+@@ -38,6 +39,31 @@
+ } evdev;
+ 
+ static CVAR_DEFINE_AUTO( evdev_keydebug, "0", 0, "print key events to console" );
++
++static CVAR_DEFINE_AUTO( nano_control_scheme, "0", 0, "Nano controls: 0 original, 1 face-button aim" );
++static CVAR_DEFINE_AUTO( nano_text_menu, "0", 0, "CS text menu input context" );
++static NanoControlState nanoControls = { 0, 0, 0, -1, 0 };
++static int NanoControlContext(void)
++{
++    if(cls.key_dest == key_game && cls.state == ca_active)
++        return nano_text_menu.value ? 2 : 1;
++    return 0;
++}
++static void NanoControlKey(int action,int down,void *opaque)
++{
++    (void)opaque;
++    int key=K_AUX1+action-1;
++    switch(action) {
++    case NC_SLOW:Cvar_SetValue("nano_look_slow",down?1:0);return;
++    case NC_UIUP:key=K_UPARROW;break;
++    case NC_UIDOWN:key=K_DOWNARROW;break;
++    case NC_UILEFT:key=K_LEFTARROW;break;
++    case NC_UIRIGHT:key=K_RIGHTARROW;break;
++    case NC_CONFIRM:key=K_ENTER;break;
++    case NC_CANCEL:key=nanoControls.context==2?K_BACKSPACE:K_ESCAPE;break;
++    }
++    Key_Event(key,down);
++}
+ 
+ static int KeycodeFromEvdev(int keycode, int value)
+ {
+@@ -320,6 +345,7 @@
+ 		return;
+ 	}
+ 
++	NanoControlRelease(&nanoControls,NanoControlKey,NULL);
+ 	close( evdev.fds[i] );
+ 	evdev.devices--;
+ 	Con_Printf( "Device %s closed successfully\n", evdev.paths[i] );
+@@ -334,6 +360,9 @@
+ void IN_EvdevFrame ( void )
+ {
+ 	int dx = 0, dy = 0;
++    if(nano_control_scheme.value==1)
++        NanoControlUpdate(&nanoControls,NanoControlContext(),NanoControlKey,NULL);
++    else NanoControlRelease(&nanoControls,NanoControlKey,NULL);
+ 
+ 	for( int i = 0; i < evdev.devices; i++ )
+ 	{
+@@ -343,6 +372,14 @@
+ 
+ 		while ( read( evdev.fds[i], &ev, sizeof( ev )) == sizeof( ev ) )
+ 		{
++            if(nano_control_scheme.value==1 && ev.type==EV_SYN && ev.code==SYN_DROPPED) {
++                NanoControlRelease(&nanoControls,NanoControlKey,NULL);
++                continue;
++            }
++            if(nano_control_scheme.value==1 && ev.type==EV_KEY && ev.code>=59 && ev.code<59+NC_BUTTONS) {
++                NanoControlEvent(&nanoControls,ev.code-59,ev.value,NanoControlContext(),NanoControlKey,NULL);
++                continue;
++            }
+ 			if ( ev.type == EV_REL )
+ 			{
+ 				switch ( ev.code )
+@@ -444,6 +481,8 @@
+ 
+ void Evdev_Init( void )
+ {
++    Cvar_RegisterVariable(&nano_control_scheme);
++    Cvar_RegisterVariable(&nano_text_menu);
+ 	Cmd_AddRestrictedCommand ("evdev_open", Evdev_OpenDevice_f, "Open event device");
+ 	Cmd_AddRestrictedCommand ("evdev_close", Evdev_CloseDevice_f, "Close event device");
+ 	Cmd_AddRestrictedCommand ("evdev_autodetect", Evdev_Autodetect_f, "Automaticly open mouses and keyboards");
+@@ -454,6 +493,7 @@
+ 
+ void Evdev_Shutdown( void )
+ {
++    NanoControlRelease(&nanoControls,NanoControlKey,NULL);
+ 	Cmd_RemoveCommand( "evdev_open" );
+ 	Cmd_RemoveCommand( "evdev_close" );
+ 	Cmd_RemoveCommand( "evdev_autodetect" );

@@ -23,6 +23,7 @@ def main():
     p.add_argument('--sdk',type=Path,required=True)
     p.add_argument('--font',type=Path,required=True)
     p.add_argument('--nav',type=Path)
+    p.add_argument('--nav-directory',type=Path,help='Import matching CS NAVs for all installed maps')
     p.add_argument('--output',type=Path,default=ROOT/'build/native-runtime')
     p.add_argument('--device-root',default='/mnt/FunKey/Xash3D-source')
     a=p.parse_args()
@@ -61,6 +62,7 @@ def main():
     for name in ('nano-clk-arm','seed-rng-arm','nano-supervise-arm'):
         copy(ROOT/'build/bin'/name,a.output/name)
     copy(ROOT/'tools/nano-run.sh',a.output/'nano-run.sh')
+    copy(ROOT/'tools/nano-ui-migrate.sh',a.output/'nano-ui-migrate.sh')
     # Resolve the complete shared-library closure from the SDK, never from an OPK.
     readelf=a.sdk/'bin/arm-funkey-linux-musleabihf-readelf'
     sysroot=a.sdk/'arm-funkey-linux-musleabihf/sysroot'
@@ -82,7 +84,14 @@ def main():
             queue.append(target)
     for name in ('tahoma.ttf','FiraSans-Regular.ttf'):
         copy(a.font,a.output/'valve/gfx/fonts'/name)
-    if a.nav: copy(a.nav,a.output/'cstrike/maps/de_dust.nav')
+    from import_navs import check_nav, import_navs
+    if a.nav:
+        check_nav(a.nav,a.output/'cstrike/maps/de_dust.bsp')
+        copy(a.nav,a.output/'cstrike/maps/de_dust.nav')
+    if a.nav_directory:
+        copied,skipped=import_navs(a.nav_directory,a.output/'cstrike/maps')
+        print(f'Imported {len(copied)} supplied NAVs with matching headers.')
+        for name,reason in skipped: print(f'Skipped {name}: {reason}')
     subprocess.run(['python3',str(ROOT/'tools/extract_icons.py'),'--games',str(a.games)],check=True)
     subprocess.run(['bash',str(ROOT/'tools/package.sh'),'--native','--runtime-root',a.device_root],check=True)
     with tarfile.open(ROOT/'build/configs.tar') as archive:

@@ -1,0 +1,1051 @@
+--- a/controls/BaseItem.h
++++ b/controls/BaseItem.h
+@@ -154,9 +154,12 @@
+ 	inline Size  GetRenderSize()     const { return m_scSize; }
+ 
+ 	void SetCharSize( EFontSizes fs );
+-	void SetNanoFont();
++	void SetNanoFont(int pixels=12);
++    int nanoFontPixels=12;
++    char nanoLabel[256];
++    const char *nanoLabelSource=nullptr;
+     enum NanoRowKind { NANO_ROW_NONE, NANO_ROW_BUTTON, NANO_ROW_SLIDER, NANO_ROW_SPIN,
+-        NANO_ROW_CHECK, NANO_ROW_TABLE, NANO_ROW_ACTION };
++        NANO_ROW_CHECK, NANO_ROW_TABLE, NANO_ROW_ACTION, NANO_ROW_FIELD, NANO_ROW_DROP, NANO_ROW_TABS, NANO_ROW_PREVIEW, NANO_ROW_GROUP };
+     virtual NanoRowKind NanoRowType() const { return NANO_ROW_NONE; }
+ 
+ 	inline void SetNameAndStatus( const char *name, const char *status, const char *tag = NULL )
+--- a/controls/BaseItem.cpp
++++ b/controls/BaseItem.cpp
+@@ -98,17 +98,14 @@
+ }
+ 
+ 
+-void CMenuBaseItem::SetNanoFont()
+-{
+-    // Rasterize the existing menu face at 12 physical pixels, and reuse it.
+-    static HFont cached = 0;
+-    static CBaseFont *cachedObject = NULL;
+-    if (!cachedObject || g_FontMgr->GetIFontFromHandle(cached) != cachedObject) {
+-        cached = CFontBuilder("Trebuchet MS", 12, 500).Create();
+-        cachedObject = g_FontMgr->GetIFontFromHandle(cached);
++void CMenuBaseItem::SetNanoFont(int pixels)
++{
++    static HFont cached[2]={0,0};static CBaseFont *objects[2]={NULL,NULL};
++    int slot=pixels==14?1:0;pixels=slot?14:12;
++    if(!objects[slot] || g_FontMgr->GetIFontFromHandle(cached[slot])!=objects[slot]) {
++        cached[slot]=CFontBuilder("Trebuchet MS",pixels,500).Create();objects[slot]=g_FontMgr->GetIFontFromHandle(cached[slot]);
+     }
+-    font = cached;
+-    charSize = (int)ceilf(12.0f/uiStatic.scaleY);
++    nanoFontPixels=pixels; font=cached[slot];charSize=(int)ceilf(pixels/uiStatic.scaleY);CalcSizes();
+ }
+ 
+ void CMenuBaseItem::SetCharSize( EFontSizes fs )
+--- a/controls/Framework.cpp
++++ b/controls/Framework.cpp
+@@ -19,6 +19,7 @@
+ #include "CheckBox.h"
+ #include "Table.h"
+ #include "Action.h"
++#include "../menus/nano-menu-layout.h"
+ 
+ // menu banners used fiexed rectangle (virtual screenspace at 640x480)
+ #define UI_BANNER_POSX		72
+@@ -28,11 +29,7 @@
+ 
+ CMenuFramework::CMenuFramework( const char *name ) : BaseClass( name )
+ {
+-	nanoSettings = !strcmp(name,"CMenuNanoOptions") || !strcmp(name,"CMenuOptions") || !strcmp(name,"CMenuAudio") ||
+-        !strcmp(name,"CMenuVideo") || !strcmp(name,"CMenuVidOptions") ||
+-        !strcmp(name,"CMenuVidModes") || !strcmp(name,"CMenuControls") ||
+-        !strcmp(name,"CAdvancedControls") || !strcmp(name,"CMenuGameOptions") ||
+-        !strcmp(name,"CMenuInputDevices");
++	nanoSettings = strcmp(name,"CMenuMain") != 0;
+     nanoScroll = 0;
+ 	memset( m_apBtns, 0, sizeof( m_apBtns ) );
+ 	m_iBtnsNum = 0;
+@@ -62,12 +59,7 @@
+ 
+ 	NanoArrangeSettings();
+ 	BaseClass::Draw();
+-	if (NanoSettingsActive()) {
+-		CMenuBaseItem *focus=ItemAtCursor();
+-		if (focus) UI_DrawString(focus->font, Point(8,ScreenHeight-15), Size(ScreenWidth-16,13),
+-			"Up/Down select  Left/Right adjust", uiColorHelp, 12, QM_LEFT, ETF_FORCECOL);
+-		return;
+-	}
++	if(NanoMenuEnabled())return;
+ 
+ 	item = ItemAtCursor();
+ 	// a1ba: maybe this should be somewhere else?
+@@ -290,70 +282,9 @@
+ 
+ void CMenuFramework::NanoArrangeSettings()
+ {
+-    if (!NanoSettingsActive()) return;
+-    // Root coordinates cover the full square screen; rows use physical-pixel dimensions.
+-    SetCoord(0, 0);
+-    SetSize((int)ceilf(ScreenWidth/uiStatic.scaleX), (int)ceilf(ScreenHeight/uiStatic.scaleY));
+-    CalcPosition(); CalcSizes();
+-    banner.Hide();
+-    DisableTransition();
+-    CMenuBaseItem *rows[64];
+-    int heights[64], count=0, total=0, focusTop=-1, focusHeight=0;
+-    for (int i=0; i<ItemCount() && count<64; ++i) {
+-        CMenuBaseItem *item=GetItemByIndex(i);
+-        if (item==&banner || !item->IsVisible()) continue;
+-        bool button=item->NanoRowType()==NANO_ROW_BUTTON;
+-        bool slider=item->NanoRowType()==NANO_ROW_SLIDER;
+-        bool spin=item->NanoRowType()==NANO_ROW_SPIN;
+-        bool check=item->NanoRowType()==NANO_ROW_CHECK;
+-        bool table=item->NanoRowType()==NANO_ROW_TABLE;
+-        bool action=item->NanoRowType()==NANO_ROW_ACTION;
+-        if (!(button || slider || spin || check || table || action)) {
+-            // Decorative previews do not compete with full-width settings controls.
+-            if (item->iFlags & QMF_INACTIVE) item->iFlags |= QMF_HIDDENBYPARENT;
+-            continue;
+-        }
+-        item->iFlags &= ~QMF_NOTIFY;
+-        item->SetNanoFont();
+-        int height=table ? 142 : (slider || spin) ? 42 : 24;
+-        if (item==ItemAtCursor()) { focusTop=total; focusHeight=height; }
+-        rows[count]=item; heights[count++]=height; total+=height;
+-    }
+-    // Show() initially selects the old banner slot; select a real control instead.
+-    if (focusTop<0) {
+-        int rowTop=0;
+-        for (int i=0; i<count; ++i) {
+-            if (!(rows[i]->iFlags & (QMF_INACTIVE|QMF_GRAYED))) {
+-                SetCursorToItem(*rows[i]); focusTop=rowTop; focusHeight=heights[i]; break;
+-            }
+-            rowTop+=heights[i];
+-        }
+-    }
+-    int viewport=ScreenHeight-30;
+-    if (focusTop>=0) {
+-        if (focusTop<nanoScroll) nanoScroll=focusTop;
+-        if (focusTop+focusHeight>nanoScroll+viewport) nanoScroll=focusTop+focusHeight-viewport;
+-    }
+-    nanoScroll=bound(0,nanoScroll,Q_max(0,total-viewport));
+-    int top=8-nanoScroll;
+-    for (int i=0; i<count; ++i) {
+-        CMenuBaseItem *item=rows[i];
+-        bool slider=item->NanoRowType()==NANO_ROW_SLIDER;
+-        bool spin=item->NanoRowType()==NANO_ROW_SPIN;
+-        bool check=item->NanoRowType()==NANO_ROW_CHECK;
+-        bool table=item->NanoRowType()==NANO_ROW_TABLE;
+-        bool visible=top>=8 && top+heights[i]<=ScreenHeight-22;
+-        if (visible) item->iFlags &= ~QMF_HIDDENBYPARENT;
+-        else item->iFlags |= QMF_HIDDENBYPARENT;
+-        int y=visible ? top+(slider || spin ? 18 : 0) : 8;
+-        int width=check ? 14 : ScreenWidth-20;
+-        int height=check ? 14 : table ? heights[i]-6 : slider || spin ? 16 : 20;
+-        Point position((int)ceilf(10.0f/uiStatic.scaleX), (int)ceilf(y/uiStatic.scaleY));
+-        Size extent((int)ceilf(width/uiStatic.scaleX),(int)ceilf(height/uiStatic.scaleY));
+-        if (item->pos.x!=position.x || item->pos.y!=position.y || item->size.w!=extent.w || item->size.h!=extent.h) {
+-            item->pos=position; item->size=extent;
+-            item->VidInit();
+-        }
+-        top+=heights[i];
+-    }
+-}
++    if(!NanoSettingsActive()) return;
++    SetCoord(0,0);
++    SetSize((int)ceilf(ScreenWidth/uiStatic.scaleX),(int)ceilf(ScreenHeight/uiStatic.scaleY));
++    CalcPosition();CalcSizes();banner.Hide();DisableTransition();
++    NanoMenuArrangeRows(*this,ScreenWidth,ScreenHeight,nanoScroll,8,&banner);
++}
+--- a/controls/Field.h
++++ b/controls/Field.h
+@@ -24,6 +24,7 @@
+ class CMenuField : public CMenuEditable
+ {
+ public:
++    NanoRowKind NanoRowType() const override { return NANO_ROW_FIELD; }
+ 	typedef CMenuEditable BaseClass;
+ 
+ 	CMenuField();
+--- a/controls/DropDown.h
++++ b/controls/DropDown.h
+@@ -30,6 +30,7 @@
+ class CMenuDropDown : public CMenuEditable
+ {
+ public:
++    NanoRowKind NanoRowType() const override { return NANO_ROW_DROP; }
+ 	typedef CMenuEditable BaseClass;
+ 
+ 	enum valType_e
+--- a/controls/TabView.h
++++ b/controls/TabView.h
+@@ -20,6 +20,7 @@
+ class CMenuTabView : public CMenuItemsHolder
+ {
+ public:
++    NanoRowKind NanoRowType() const override { return NANO_ROW_TABS; }
+ 	typedef CMenuItemsHolder BaseClass;
+ 	CMenuTabView();
+ 
+--- a/controls/PlayerModelView.h
++++ b/controls/PlayerModelView.h
+@@ -29,6 +29,7 @@
+ class CMenuPlayerModelView : public CMenuBaseItem
+ {
+ public:
++    NanoRowKind NanoRowType() const override { return NANO_ROW_PREVIEW; }
+ 	CMenuPlayerModelView();
+ 	void VidInit() override;
+ 	void Draw() override;
+--- a/menus/Main.cpp
++++ b/menus/Main.cpp
+@@ -23,6 +23,7 @@
+ #include "Action.h"
+ #include "Bitmap.h"
+ #include "PicButton.h"
++#include "../menus/nano-menu-layout.h"
+ #include "YesNoMessageBox.h"
+ #include "keydefs.h"
+ #include "MenuStrings.h"
+@@ -408,19 +409,30 @@
+         SetSize((int)ceilf(ScreenWidth/uiStatic.scaleX), (int)ceilf(ScreenHeight/uiStatic.scaleY));
+         CalcPosition(); CalcSizes();
+     }
+-    int row = 0, visible = 0;
+-    for (unsigned i = 0; i < sizeof(rows)/sizeof(rows[0]); ++i) if (rows[i]->Parent() == this && rows[i]->IsVisible()) ++visible;
+-    float rowPixels = visible ? (ScreenHeight - 16.0f) / visible : 22.0f;
+-    if (rowPixels > 22.0f) rowPixels = 22.0f;
+-    for (unsigned i = 0; i < sizeof(rows)/sizeof(rows[0]); ++i) {
+-        if (style) rows[i]->SetNanoScale(nano ? 2.0f : 1.0f);
+-        if (nano && rows[i]->Parent() == this && rows[i]->IsVisible()) {
+-            const int gap = (int)(rowPixels / uiStatic.scaleY);
+-            rows[i]->SetCoord(50, (int)ceilf(8.0f / uiStatic.scaleY) + row * gap);
+-            rows[i]->CalcPosition();
+-            rows[i]->CalcSizes();
+-            ++row;
+-        }
++    minimizeBtn.SetVisibility(!nano);quitButton.SetVisibility(!nano);
++    if(!nano)return;
++    int heights[32],tops[32],total=0,focusTop=-1,focusHeight=0;
++    for(unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);++i) {
++        CMenuPicButton *item=rows[i];heights[i]=0;tops[i]=total;
++        if(item->Parent()!=this || !item->IsVisible())continue;
++        if(style)item->SetNanoScale(2.3f);
++        item->SetNanoFont(14);
++        if(item->szName!=item->nanoLabel)item->nanoLabelSource=item->szName;
++        NanoMenuWrap(item->font,item->nanoLabelSource,item->nanoLabel,sizeof(item->nanoLabel),ScreenWidth-24,14);
++        item->szName=item->nanoLabel;int h=24;
++        for(const char *p=item->nanoLabel;*p;++p)if(*p=='\n')h+=16;
++        heights[i]=h;total+=h;
++        if(item==ItemAtCursor()){focusTop=tops[i];focusHeight=h;}
++    }
++    int viewport=ScreenHeight-16;
++    if(focusTop>=0){if(focusTop<nanoScroll)nanoScroll=focusTop;
++        if(focusTop+focusHeight>nanoScroll+viewport)nanoScroll=focusTop+focusHeight-viewport;}
++    nanoScroll=bound(0,nanoScroll,Q_max(0,total-viewport));
++    for(unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);++i)if(heights[i]) {
++        int y=8+tops[i]-nanoScroll;bool visible=y>=8 && y+heights[i]<=ScreenHeight-8;
++        if(visible)rows[i]->iFlags&=~QMF_HIDDENBYPARENT;else rows[i]->iFlags|=QMF_HIDDENBYPARENT;
++        NanoMenuRect(*rows[i],12,visible?y:8,ScreenWidth-24,heights[i]-4);
++        rows[i]->SetNanoFont(14);
+     }
+ 
+ }
+--- a/font/StbFont.cpp
++++ b/font/StbFont.cpp
+@@ -87,14 +87,16 @@
+ 	}
+ 
+ 	// HACKHACK: for some reason size scales between ft2 and stbtt are different
+-	scale = stbtt_ScaleForPixelHeightPrecision( &m_fontInfo, tall + 4 );
++	scale = EngFuncs::GetCvarFloat("nano_hud_profile") ? stbtt_ScaleForMappingEmToPixels(&m_fontInfo,tall) : stbtt_ScaleForPixelHeightPrecision(&m_fontInfo,tall+4);
+ 	int x0, y0, x1, y1;
+ 
+-	stbtt_GetFontVMetrics( &m_fontInfo, &m_iAscent, NULL, NULL );
++	int descent=0,lineGap=0;
++    stbtt_GetFontVMetrics(&m_fontInfo,&m_iAscent,&descent,&lineGap);
++    int lineHeight=m_iAscent-descent+lineGap;
+ 	m_iAscent = round( m_iAscent * scale );
+ 
+ 	stbtt_GetFontBoundingBox( &m_fontInfo, &x0, &y0, &x1, &y1 );
+-	m_iHeight = round(( y1 - y0 ) * scale ); // maybe wrong!
++	m_iHeight = EngFuncs::GetCvarFloat("nano_hud_profile") ? (int)ceil(lineHeight*scale) : round((y1-y0)*scale);
+ 	m_iMaxCharWidth = round(( x1 - x0 ) * scale ); // maybe wrong!
+ 
+ 	return true;
+--- a/menus/Configuration.cpp
++++ b/menus/Configuration.cpp
+@@ -21,6 +21,7 @@
+ #include "Framework.h"
+ #include "Bitmap.h"
+ #include "PicButton.h"
++#include "../menus/nano-menu-layout.h"
+ #include "YesNoMessageBox.h"
+ #include "keydefs.h"
+ #include "TabView.h"
+@@ -62,10 +63,13 @@
+ 		PC_AUDIO, UI_Audio_Menu, QMF_NOTIFY );
+ 	AddButton( L( "GameUI_Video" ), L( "Change screen size, video mode and gamma" ),
+ 		PC_VIDEO, UI_Video_Menu, QMF_NOTIFY );
++    if (!NanoMenuEnabled())
+ 	AddButton( L( "Touch" ), L( "Change touch settings and buttons" ),
+ 		PC_TOUCH, UI_Touch_Menu, QMF_NOTIFY, 't' );
++    if(!NanoMenuEnabled())
+ 	AddButton( L( "GameUI_Joystick" ), L( "Change gamepad axis and button settings" ),
+ 		PC_GAMEPAD, UI_GamePad_Menu, QMF_NOTIFY, 'g' );
++    if (!NanoMenuEnabled())
+ 	AddButton( L( "Update" ), L( "Check for updates" ),
+ 		PC_UPDATE, msgBox.MakeOpenEvent(), QMF_NOTIFY );
+     if (ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile"))
+--- a/menus/Controls.cpp
++++ b/menus/Controls.cpp
+@@ -22,6 +22,7 @@
+ #include "keydefs.h"
+ #include "Bitmap.h"
+ #include "PicButton.h"
++#include "../menus/nano-menu-layout.h"
+ #include "Action.h"
+ #include "YesNoMessageBox.h"
+ #include "MessageBox.h"
+--- a/menus/Video.cpp
++++ b/menus/Video.cpp
+@@ -21,6 +21,7 @@
+ #include "Framework.h"
+ #include "Bitmap.h"
+ #include "PicButton.h"
++#include "../menus/nano-menu-layout.h"
+ 
+ #define ART_BANNER		"gfx/shell/head_video"
+ 
+@@ -45,6 +46,7 @@
+ 
+ 		menu_video->AddItem( menu_video->banner );
+ 		menu_video->AddButton( L( "Video options" ), L( "Set video options such as screen size, gamma and image quality." ), PC_VID_OPT, UI_VidOptions_Menu, QMF_NOTIFY );
++    if (!NanoMenuEnabled())
+ 		menu_video->AddButton( L( "Video modes" ), L( "Set video modes and configure 3D accelerators." ), PC_VID_MODES, UI_VidModes_Menu, QMF_NOTIFY );
+ 		menu_video->AddButton( L( "Done" ), L( "Go back to the previous menu" ), PC_DONE, VoidCb( &CMenuFramework::Hide ), QMF_NOTIFY );
+ 	}
+--- a/controls/YesNoMessageBox.h
++++ b/controls/YesNoMessageBox.h
+@@ -30,6 +30,10 @@
+ 	void _Init() override;
+ 	void _VidInit() override;
+ 	void Draw() override;
++    void Show() override;
++    void NanoArrangeDialog();
++    char nanoMessage[4096];
++    int nanoMessageScroll=0;
+ 	bool KeyDown( int key ) override;
+ 	void SetMessage( const char *msg );
+ 	void SetPositiveButton( const char *msg, EDefaultBtns buttonPic, int extrawidth = 0 );
+--- a/controls/YesNoMessageBox.cpp
++++ b/controls/YesNoMessageBox.cpp
+@@ -19,6 +19,8 @@
+ #include "PicButton.h"
+ #include "YesNoMessageBox.h"
+ #include "Utils.h"
++#include "Scissor.h"
++#include "../menus/nano-menu-layout.h"
+ 
+ static void ToggleInactiveInternalCb( CMenuBaseItem *pSelf, void *pExtra );
+ 
+@@ -119,12 +121,16 @@
+ */
+ void CMenuYesNoMessageBox::Draw()
+ {
++    NanoArrangeDialog();
+ 	UI_FillRect( 0, 0, gpGlobals->scrWidth, gpGlobals->scrHeight, 0x40000000 );
+ 
+ 	EngFuncs::FillRGBA( m_scPos.x, m_scPos.y, m_scSize.w, m_scSize.h, 20, 20, 20, 235 );
+ 	UI_DrawRectangle( m_scPos, m_scSize, uiInputFgColor );
+ 
+-	CMenuBaseWindow::Draw();
++	if(NanoMenuEnabled()) {
++        UI::Scissor::PushScissor(Point(12,12),Size(ScreenWidth-24,ScreenHeight-56));dlgMessage1.Draw();UI::Scissor::PopScissor();
++        yes.Draw();if(!m_bIsAlert)no.Draw();
++    } else CMenuBaseWindow::Draw();
+ }
+ 
+ /*
+@@ -142,7 +148,10 @@
+ 		return true;
+ 	}
+ 
+-	return BaseClass::KeyDown( key );
++	if(NanoMenuEnabled() && (UI::Key::IsUpArrow(key)||UI::Key::IsDownArrow(key))) {
++        nanoMessageScroll+=UI::Key::IsUpArrow(key)?-1:1;NanoArrangeDialog();return true;
++    }
++    return BaseClass::KeyDown( key );
+ }
+ 
+ /*
+@@ -269,3 +278,29 @@
+ }
+ 
+ ADD_COMMAND( menu_showmessagebox, UI_ShowMessageBox_f );
++
++void CMenuYesNoMessageBox::Show()
++{
++    BaseClass::Show();nanoMessageScroll=0;
++    if(NanoMenuEnabled()) {NanoArrangeDialog();SetCursorToItem(m_bIsAlert?yes:no);DisableTransition();}
++}
++void CMenuYesNoMessageBox::NanoArrangeDialog()
++{
++    if(!NanoMenuEnabled())return;
++    SetRect(0,0,(int)ceilf(ScreenWidth/uiStatic.scaleX),(int)ceilf(ScreenHeight/uiStatic.scaleY));CalcPosition();CalcSizes();
++    dlgMessage1.SetNanoFont(14);
++    if((uintptr_t)dlgMessage1.szName<(uintptr_t)nanoMessage || (uintptr_t)dlgMessage1.szName>=(uintptr_t)nanoMessage+sizeof(nanoMessage))dlgMessage1.nanoLabelSource=dlgMessage1.szName;
++    NanoMenuWrap(dlgMessage1.font,dlgMessage1.nanoLabelSource,nanoMessage,sizeof(nanoMessage),ScreenWidth-24,14);
++    // The message action wraps inside a full-width native rectangle.
++    int lines=1;for(const char *p=nanoMessage;*p;p++)if(*p=='\n')++lines;
++    int visible=(ScreenHeight-56)/16;
++    nanoMessageScroll=bound(0,nanoMessageScroll,Q_max(0,lines-visible));
++    const char *text=nanoMessage;
++    for(int row=0;row<nanoMessageScroll && *text;row++){while(*text && *text!='\n')++text;if(*text)++text;}
++    dlgMessage1.szName=text;dlgMessage1.eTextAlignment=QM_TOP;
++    NanoMenuRect(dlgMessage1,12,12,ScreenWidth-24,ScreenHeight-56);
++    dlgMessage1.SetNanoFont(14);yes.SetNanoFont(14);no.SetNanoFont(14);
++    NanoMenuRect(yes,m_bIsAlert?64:12,ScreenHeight-36,m_bIsAlert?112:100,24);
++    if(!m_bIsAlert)NanoMenuRect(no,128,ScreenHeight-36,100,24);
++    yes.SetNanoFont(14);no.SetNanoFont(14);
++}
+--- a/controls/MessageBox.cpp
++++ b/controls/MessageBox.cpp
+@@ -18,6 +18,8 @@
+ #include "Action.h"
+ #include "ItemsHolder.h"
+ #include "MessageBox.h"
++#include "../menus/nano-menu-layout.h"
++#include "Scissor.h"
+ 
+ CMenuMessageBox::CMenuMessageBox(const char *name) : BaseClass( name )
+ {
+@@ -36,12 +38,37 @@
+ 
+ void CMenuMessageBox::Draw()
+ {
++    if(NanoMenuEnabled()) {
++        NanoMenuRect(*this,8,64,ScreenWidth-16,112);
++        dlgMessage.SetNanoFont(14);
++        if((uintptr_t)dlgMessage.szName<(uintptr_t)dlgMessage.nanoLabel || (uintptr_t)dlgMessage.szName>=(uintptr_t)dlgMessage.nanoLabel+sizeof(dlgMessage.nanoLabel))dlgMessage.nanoLabelSource=dlgMessage.szName;
++        NanoMenuWrap(dlgMessage.font,dlgMessage.nanoLabelSource,dlgMessage.nanoLabel,sizeof(dlgMessage.nanoLabel),ScreenWidth-32,14);
++        dlgMessage.szName=dlgMessage.nanoLabel;
++        int lines=1;for(const char *p=dlgMessage.nanoLabel;*p;++p)if(*p=='\n')++lines;
++        int height=Q_min(ScreenHeight-16,Q_max(112,lines*16+16));
++        NanoMenuRect(*this,8,(ScreenHeight-height)/2,ScreenWidth-16,height);
++        NanoMenuRect(dlgMessage,8,8,ScreenWidth-32,height-16);dlgMessage.SetNanoFont(14);
++        nanoMessageScroll=bound(0,nanoMessageScroll,Q_max(0,lines-(height-16)/16));
++        const char *text=dlgMessage.nanoLabel;
++        for(int i=0;i<nanoMessageScroll && *text;i++){while(*text && *text!='\n')++text;if(*text)++text;}
++        dlgMessage.szName=text;dlgMessage.eTextAlignment=QM_TOP;
++    }
+ 	EngFuncs::FillRGBA( m_scPos.x, m_scPos.y, m_scSize.w, m_scSize.h, 20, 20, 20, 235 );
+ 	UI_DrawRectangle( m_scPos, m_scSize, uiInputFgColor );
+-	BaseClass::Draw();
++	if(NanoMenuEnabled()){
++        UI::Scissor::PushScissor(Point(m_scPos.x+8,m_scPos.y+8),Size(m_scSize.w-16,m_scSize.h-16));
++        dlgMessage.Draw();UI::Scissor::PopScissor();
++    } else BaseClass::Draw();
+ }
+ 
+ void CMenuMessageBox::SetMessage( const char *sz )
+ {
+-	dlgMessage.szName = sz;
++	nanoMessageScroll=0;dlgMessage.szName=sz;
+ }
++
++bool CMenuMessageBox::KeyDown(int key) {
++    if(NanoMenuEnabled() && (UI::Key::IsUpArrow(key)||UI::Key::IsDownArrow(key))) {
++        nanoMessageScroll+=UI::Key::IsUpArrow(key)?-1:1;return true;
++    }
++    return BaseClass::KeyDown(key);
++}
+--- a/menus/AdvancedControls.cpp
++++ b/menus/AdvancedControls.cpp
+@@ -23,6 +23,7 @@
+ #include "MenuStrings.h"
+ #include "Bitmap.h"
+ #include "PicButton.h"
++#include "../menus/nano-menu-layout.h"
+ #include "CheckBox.h"
+ #include "Slider.h"
+ 
+@@ -199,16 +200,16 @@
+ 
+ 	AddItem( banner );
+ 	AddItem( done );
+-	AddItem( inputDev );
++	if(!NanoMenuEnabled()) AddItem( inputDev );
+ 	AddItem( crosshair );
+-	AddItem( invertMouse );
+-	AddItem( mouseLook );
+-	AddItem( lookSpring );
+-	AddItem( lookStrafe );
+-	AddItem( lookFilter );
++	if(!NanoMenuEnabled()) AddItem( invertMouse );
++	if(!NanoMenuEnabled()) AddItem( mouseLook );
++	if(!NanoMenuEnabled()) AddItem( lookSpring );
++	if(!NanoMenuEnabled()) AddItem( lookStrafe );
++	if(!NanoMenuEnabled()) AddItem( lookFilter );
+ 	AddItem( autoaim );
+-	AddItem( rawinput );
+-	AddItem( sensitivity );
++	if(!NanoMenuEnabled()) AddItem( rawinput );
++	if(!NanoMenuEnabled()) AddItem( sensitivity );
+ }
+ 
+ 
+--- a/controls/PicButton.cpp
++++ b/controls/PicButton.cpp
+@@ -18,6 +18,7 @@
+ #include "BaseMenu.h"
+ #include "Bitmap.h"
+ #include "PicButton.h"
++#include "../menus/nano-menu-layout.h"
+ #include "Utils.h"
+ #include "Scissor.h"
+ #include "Btns.h"
+@@ -249,7 +250,12 @@
+ */
+ void CMenuPicButton::Draw( )
+ {
+-	int state = BUTTON_NOFOCUS;
++	const bool native=NanoMenuEnabled();
++    if(native)SetNanoFont(nanoFontPixels);
++    if(native && IsCurrentSelected() && !(iFlags&QMF_GRAYED)) {
++        EngFuncs::FillRGBA(m_scPos.x-2,m_scPos.y,m_scSize.w+4,m_scSize.h,64,49,12,180);
++    }
++    int state = BUTTON_NOFOCUS;
+ 
+ 	if( iFlags & (QMF_HASMOUSEFOCUS|QMF_HASKEYBOARDFOCUS))
+ 	{
+--- a/font/BaseFontBackend.cpp
++++ b/font/BaseFontBackend.cpp
+@@ -582,7 +582,7 @@
+ 	bmp_t *bmp;
+ 
+ 	// skip special symbol used for engine
+-	V_snprintf( path, sizeof( path ), ".fontcache/%s", filename[0] == '#' ? filename + 1 : filename );
++	V_snprintf( path, sizeof( path ), (ScreenWidth<=320 && EngFuncs::GetCvarFloat("nano_hud_profile"))?".fontcache/nano-v2-r2/%s":".fontcache/%s", filename[0] == '#' ? filename + 1 : filename );
+ 
+ 	if( !EngFuncs::FileExists( path ))
+ 		return false;
+@@ -772,7 +772,7 @@
+ 	if( buf_p + bmpSize - data != size )
+ 		Host_Error( "%s: %i: buf_p + bmpSize - data != size", __FILE__, __LINE__ );
+ 
+-	V_snprintf( path, sizeof( path ), ".fontcache/%s", filename );
++	V_snprintf( path, sizeof( path ), (ScreenWidth<=320 && EngFuncs::GetCvarFloat("nano_hud_profile"))?".fontcache/nano-v2-r2/%s":".fontcache/%s", filename );
+ 	EngFuncs::COM_SaveFile( path, data, size );
+ 
+ 	delete[] data;
+--- a/controls/BaseWindow.cpp
++++ b/controls/BaseWindow.cpp
+@@ -18,6 +18,7 @@
+ #include "PicButton.h"
+ #include "ItemsHolder.h"
+ #include "BaseWindow.h"
++#include "../menus/nano-menu-layout.h"
+ 
+ CMenuBaseWindow::CMenuBaseWindow( const char *name, CWindowStack *pStack ) : BaseClass()
+ {
+@@ -41,7 +42,13 @@
+ 	// otherwise we will have an invalid cursor until first mouse move event
+ #if 1
+ 	m_iCursorPrev = -1;
+-	MouseMove( uiStatic.cursorX, uiStatic.cursorY );
++	if(NanoMenuEnabled()) {
++        FOR_EACH_VEC(m_pItems,i) {
++            CMenuBaseItem *item=m_pItems[i];
++            if(!item->IsVisible() || (item->iFlags&(QMF_GRAYED|QMF_INACTIVE|QMF_MOUSEONLY)))continue;
++            SetCursor(i);break;
++        }
++    } else MouseMove(uiStatic.cursorX,uiStatic.cursorY);
+ #else
+ 	m_iCursor = 0;
+ 	m_iCursorPrev = 0;
+--- a/menus/SaveLoad.cpp
++++ b/menus/SaveLoad.cpp
+@@ -22,6 +22,7 @@
+ #include "Bitmap.h"
+ #include "PicButton.h"
+ #include "Action.h"
++#include "../menus/nano-menu-layout.h"
+ 
+ #define ART_BANNER		"gfx/shell/head_saveload"
+ 
+@@ -60,7 +61,7 @@
+ 	AddButton( L( "GameUI_LoadGame" ), L( "GameUI_LoadGameHelp" ), PC_LOAD_GAME, UI_LoadGame_Menu, QMF_NOTIFY );
+ 	AddButton( L( "GameUI_SaveGame" ), L( "GameUI_SaveGameHelp" ), PC_SAVE_GAME, UI_SaveGame_Menu, QMF_NOTIFY );
+ 	AddButton( L( "Done" ), L( "Go back to the Main menu" ), PC_DONE, VoidCb( &CMenuSaveLoad::Hide ), QMF_NOTIFY );
+-	AddItem( hintMessage );
++	if(!NanoMenuEnabled())AddItem(hintMessage);
+ }
+ 
+ ADD_MENU( menu_saveload, CMenuSaveLoad, UI_SaveLoad_Menu );
+--- a/menus/LoadGame.cpp
++++ b/menus/LoadGame.cpp
+@@ -68,7 +68,8 @@
+ class CMenuSavePreview : public CMenuBaseItem
+ {
+ public:
+-	CMenuSavePreview() : CMenuBaseItem(), fallback( "{GRAF001" )
++	NanoRowKind NanoRowType() const override{return NANO_ROW_PREVIEW;}
++    CMenuSavePreview() : CMenuBaseItem(), fallback( "{GRAF001" )
+ 	{
+ 		iFlags = QMF_INACTIVE;
+ 	}
+--- a/controls/MessageBox.h
++++ b/controls/MessageBox.h
+@@ -25,7 +25,9 @@
+ 
+ 	CMenuMessageBox( const char *name = "Unnamed MessageBox" );
+ 
+-	void SetMessage( const char *sz );
++	void SetMessage(const char *sz);
++    bool KeyDown(int key) override;
++    int nanoMessageScroll=0;
+ private:
+ 	void _Init() override;
+ 	void Draw() override;
+--- a/controls/DropDown.cpp
++++ b/controls/DropDown.cpp
+@@ -20,6 +20,7 @@
+ 
+ #include "BaseMenu.h"
+ #include "DropDown.h"
++#include "../menus/nano-menu-layout.h"
+ 
+ CMenuDropDown::CMenuDropDown() : BaseClass()
+ {
+@@ -81,12 +82,18 @@
+ 
+ bool CMenuDropDown::KeyDown( int key )
+ {
++    if(NanoMenuEnabled() && (UI::Key::IsLeftArrow(key)||UI::Key::IsRightArrow(key)))return true;
+ 	return false;
+ }
+ 
+ bool CMenuDropDown::KeyUp( int key )
+ {
+-	bool ret = false;
++	if(NanoMenuEnabled()) {
++        int step=UI::Key::IsLeftArrow(key)?-1:UI::Key::IsRightArrow(key)||UI::Key::IsEnter(key)?1:0;
++        if(!step || !m_szNames.Count())return false;
++        m_iState=(m_iState+step+m_szNames.Count())%m_szNames.Count();SetCvar();_Event(QM_CHANGED);return true;
++    }
++    bool ret = false;
+ 	int state = m_iState;
+ 
+ 	if( UI::Key::IsLeftMouse( key ) && FBitSet( iFlags, QMF_HASMOUSEFOCUS ) )
+@@ -154,7 +161,8 @@
+ 
+ void CMenuDropDown::Draw()
+ {
+-	uint textflags = ETF_NO_WRAP;
++	if(NanoMenuEnabled()){m_isOpen=false;m_scItemSize=m_scSize;m_ArrowSize.w=m_ArrowSize.h=12;}
++    uint textflags = ETF_NO_WRAP;
+ 	uint borderColor = uiInputFgColor;
+ 
+ 	if( iFlags & QMF_DROPSHADOW )
+--- a/controls/Table.cpp
++++ b/controls/Table.cpp
+@@ -19,6 +19,7 @@
+ #include "Table.h"
+ #include "Utils.h"
+ #include "Scissor.h"
++#include "../menus/nano-menu-layout.h"
+ 
+ #define HEADER_HEIGHT_FRAC 1.75f
+ 
+@@ -45,6 +46,7 @@
+ 
+ void CMenuTable::VidInit()
+ {
++    if(NanoMenuEnabled())SetNanoFont();
+ 	BaseClass::VidInit();
+ 
+ 	iBackgroundColor.SetDefault( uiColorBlack );
+@@ -54,7 +56,7 @@
+ 
+ 	iStrokeWidth = uiStatic.outlineWidth;
+ 
+-	iNumRows = ( m_scSize.h - iStrokeWidth * 2 ) / m_scChSize - 1;
++	iNumRows = ( m_scSize.h - iStrokeWidth * 2 ) / (NanoMenuEnabled()?24:m_scChSize) - 1;
+ 
+ 	if( !iCurItem )
+ 	{
+@@ -77,7 +79,7 @@
+ 		// set columns width
+ 		if( !columns[i].flWidth )
+ 		{
+-			SetColumnWidth( i, 1 / m_pModel->GetColumns(), false );
++			SetColumnWidth( i, 1.0f / m_pModel->GetColumns(), false );
+ 		}
+ 
+ 		if( columns[i].fStaticWidth )
+@@ -279,11 +281,11 @@
+ 			{
+ 				// test for item select
+ 				int starty = boxPos.y + iStrokeWidth;
+-				int endy = starty + iNumRows * m_scChSize;
++				int endy=starty+iNumRows*(NanoMenuEnabled()?24:m_scChSize);
+ 				if( uiStatic.cursorY > starty && uiStatic.cursorY < endy )
+ 				{
+ 					int offsety = uiStatic.cursorY - starty;
+-					int newCur = iTopItem + offsety / m_scChSize;
++					int newCur = iTopItem + offsety / (NanoMenuEnabled()?24:m_scChSize);
+ 
+ 					if( newCur < m_pModel->GetRows() )
+ 					{
+@@ -498,7 +500,7 @@
+ 	int i;
+ 	Size sz;
+ 
+-	sz.h = m_scChSize;
++	sz.h = NanoMenuEnabled()?24:m_scChSize;
+ 
+ 	unsigned int newFillColor;
+ 	bool forceFillColor = false;
+@@ -527,6 +529,7 @@
+ 
+ 		const char *str = m_pModel->GetCellText( line, i );
+ 		const ECellType type = m_pModel->GetCellType( line, i );
++        char cell[1024];if(NanoMenuEnabled() && type==CELL_TEXT && str){NanoMenuFit(font,str,cell,sizeof(cell),sz.w-4,12);str=cell;}
+ 
+ 		if( !str /* && type != CELL_ITEM  */) // headers may be null, cells too
+ 			continue;
+@@ -545,8 +548,10 @@
+ 		switch( type )
+ 		{
+ 		case CELL_TEXT:
++            UI::Scissor::PushScissor(p,sz);
+ 			UI_DrawString( font, p, sz, str, textColor, m_scChSize, m_pModel->GetAlignmentForColumn( i ),
+-				textflags | ( m_pModel->IsCellTextWrapped( line, i ) ? 0 : ETF_NOSIZELIMIT ) );
++				textflags | (NanoMenuEnabled()?ETF_NO_WRAP:(m_pModel->IsCellTextWrapped(line,i)?0:ETF_NOSIZELIMIT)));
++            UI::Scissor::PopScissor();
+ 			break;
+ 		case CELL_IMAGE_ADDITIVE:
+ 		case CELL_IMAGE_DEFAULT:
+@@ -612,7 +617,7 @@
+ 	int upFocus, downFocus, scrollbarFocus;
+ 
+ 	// HACKHACK: recalc iNumRows, to be not greater than iNumItems
+-	iNumRows = ( m_scSize.h - iStrokeWidth * 2 ) / m_scChSize - 1;
++	iNumRows = ( m_scSize.h - iStrokeWidth * 2 ) / (NanoMenuEnabled()?24:m_scChSize) - 1;
+ 	if( iNumRows > m_pModel->GetRows() )
+ 		iNumRows = m_pModel->GetRows();
+ 
+@@ -622,7 +627,7 @@
+ 
+ 	if( UI_CursorInRect( boxPos, boxSize ) )
+ 	{
+-		int newCur = iTopItem + ( uiStatic.cursorY - boxPos.y ) / m_scChSize;
++		int newCur = iTopItem + ( uiStatic.cursorY - boxPos.y ) / (NanoMenuEnabled()?24:m_scChSize);
+ 
+ 		if( newCur < m_pModel->GetRows() )
+ 			iHighlight = newCur;
+@@ -747,7 +752,7 @@
+ 	UI::Scissor::PushScissor( boxPos, boxSize );
+ 	y = boxPos.y;
+ 
+-	for( i = iTopItem; i < m_pModel->GetRows() && i < iNumRows + iTopItem; i++, y += m_scChSize )
++	for( i = iTopItem; i < m_pModel->GetRows() && i < iNumRows + iTopItem; i++, y += (NanoMenuEnabled()?24:m_scChSize) )
+ 	{
+ 		int color = colorBase; // predict state
+ 		bool forceCol = false;
+--- a/controls/TabView.cpp
++++ b/controls/TabView.cpp
+@@ -14,6 +14,7 @@
+ */
+ #include "TabView.h"
+ #include "Scissor.h"
++#include "../menus/nano-menu-layout.h"
+ 
+ CMenuTabView::CMenuTabView() : BaseClass()
+ {
+@@ -25,21 +26,22 @@
+ Point CMenuTabView::GetPositionOffset() const
+ {
+ 	Point ret = m_scPos;
+-	ret.y += m_scChSize * 1.5f;
++	ret.y += (NanoMenuEnabled()?24:m_scChSize*1.5f);
+ 
+ 	return ret;
+ }
+ 
+ void CMenuTabView::VidInit()
+ {
++    if(NanoMenuEnabled())SetNanoFont();
+ 	CalcPosition();
+ 	CalcSizes();
+ 
+ 	_VidInit();
+ 	VidInitItems();
+ 
+-	m_szTab.w = m_scSize.w / m_pItems.Count();
+-	m_szTab.h = m_scChSize * 1.5f;
++	m_szTab.w=NanoMenuEnabled()?m_scSize.w:m_pItems.Count()?m_scSize.w/m_pItems.Count():m_scSize.w;
++	m_szTab.h = (NanoMenuEnabled()?24:m_scChSize*1.5f);
+ }
+ 
+ void CMenuTabView::DrawTab(Point pt, const char *name, bool isEnd, bool isSelected, bool isHighlighted)
+@@ -82,16 +84,22 @@
+ 	Point tabOffset = m_scPos;
+ 	FOR_EACH_VEC( m_pItems, i )
+ 	{
+-		bool isEnd = i == ( m_pItems.Count() - 1 );
++		if(NanoMenuEnabled() && i!=m_iCursor)continue;
++        bool isEnd = NanoMenuEnabled() || i == (m_pItems.Count()-1);
+ 		bool isHighlighted = UI_CursorInRect( tabOffset, m_szTab );
+ 		bool isSelected = i == m_iCursor;
+ 
+-		DrawTab( tabOffset, m_pItems[i]->szName, isEnd, isSelected, isHighlighted );
++		char label[1024],name[1024];const char *text=m_pItems[i]->szName;
++        if(NanoMenuEnabled()) {
++            snprintf(name,sizeof(name),"%d/%d %s",i+1,m_pItems.Count(),text?text:"");
++            NanoMenuFit(font,name,label,sizeof(label),m_scSize.w-8,12);text=label;
++        }
++        DrawTab(tabOffset,text,isEnd,isSelected,isHighlighted);
+ 		tabOffset.x += m_szTab.w;
+ 	}
+ 
+-	Point contentOffset = Point( m_scPos.x, m_scPos.y + m_scChSize * 1.5f );
+-	Size contentSize = Size( m_scSize.w, m_scSize.h - m_scChSize * 1.5f );
++	Point contentOffset = Point( m_scPos.x, m_scPos.y + (NanoMenuEnabled()?24:m_scChSize*1.5f) );
++	Size contentSize = Size( m_scSize.w, m_scSize.h - (NanoMenuEnabled()?24:m_scChSize*1.5f) );
+ 
+ 	// draw line after tab
+ 	UI_FillRect( contentOffset.x, contentOffset.y,
+--- a/menus/VideoOptions.cpp
++++ b/menus/VideoOptions.cpp
+@@ -21,6 +21,7 @@
+ #include "Framework.h"
+ #include "Bitmap.h"
+ #include "PicButton.h"
++#include "../menus/nano-menu-layout.h"
+ #include "Slider.h"
+ #include "CheckBox.h"
+ #include "YesNoMessageBox.h"
+@@ -47,6 +48,8 @@
+ 
+ 	class CMenuVidPreview : public CMenuBitmap
+ 	{
++    public:
++    NanoRowKind NanoRowType() const override{return NANO_ROW_PREVIEW;}
+ 		void Draw() override;
+ 	} testImage;
+ 
+@@ -118,6 +121,7 @@
+ */
+ void CMenuVidOptions::CMenuVidPreview::Draw( )
+ {
++    if(NanoMenuEnabled()){int w=EngFuncs::PIC_Width(szPic),h=EngFuncs::PIC_Height(szPic);if(w>0 && h>0){int dh=m_scSize.h,dw=dh*w/h;if(dw>m_scSize.w){dw=m_scSize.w;dh=dw*h/w;}UI_DrawPic(m_scPos.x+(m_scSize.w-dw)/2,m_scPos.y+(m_scSize.h-dh)/2,dw,dh,uiColorWhite,szPic);}return;}
+ 	int		color = 0xFFFF0000; // 255, 0, 0, 255
+ 	int		viewport[4];
+ 	int		viewsize, size, sb_lines;
+@@ -277,12 +281,12 @@
+ #endif
+ 	AddItem( gammaIntensity );
+ 	AddItem( brightness );
+-	AddItem( detailtex );
+-	AddItem( vbo );
+-	AddItem( swwater );
+-	AddItem( overbright );
++	if(!NanoMenuEnabled())AddItem(detailtex);
++	if(!NanoMenuEnabled())AddItem(vbo);
++	if(!NanoMenuEnabled())AddItem(swwater);
++	if(!NanoMenuEnabled())AddItem(overbright);
+ 	AddItem( filtering );
+-	AddItem( hudscale );
++	if(!NanoMenuEnabled())AddItem(hudscale);
+ 	AddItem( testImage );
+ 
+ #if LEGACY_VIEWSIZE
+--- a/controls/Field.cpp
++++ b/controls/Field.cpp
+@@ -17,6 +17,7 @@
+ #include "extdll_menu.h"
+ #include "BaseMenu.h"
+ #include "Field.h"
++#include "../menus/nano-menu-layout.h"
+ #include "Utils.h"
+ #include "utflib.h"
+ 
+@@ -386,7 +387,7 @@
+ 		EngFuncs::DrawConsoleString( x, m_scPos.y, szStatusText );
+ 	}
+ 
+-	if( newPos.y > ScreenHeight - m_scSize.h - 40 )
++	if(!NanoMenuEnabled() && newPos.y > ScreenHeight - m_scSize.h - 40)
+ 	{
+ 		if(iFlags & QMF_HASKEYBOARDFOCUS)
+ 			newPos.y = ScreenHeight - m_scSize.h - 15;
+--- a/controls/ItemsHolder.h
++++ b/controls/ItemsHolder.h
+@@ -24,6 +24,8 @@
+ 	typedef CMenuBaseItem BaseClass;
+ 
+ 	CMenuItemsHolder();
++    NanoRowKind NanoRowType() const override{return NANO_ROW_GROUP;}
++    int nanoGroupScroll=0;
+ 
+ 	// Overload _Init, _VidInit instead of these methods
+ 	void Init() override;
+--- a/controls/ItemsHolder.cpp
++++ b/controls/ItemsHolder.cpp
+@@ -17,6 +17,7 @@
+ #include "Utils.h"
+ #include "PicButton.h"
+ #include "ItemsHolder.h"
++#include "../menus/nano-menu-layout.h"
+ #include "Scissor.h"
+ #include <string.h>
+ 
+@@ -32,6 +33,7 @@
+ bool CMenuItemsHolder::Key( const int key, const bool down )
+ {
+ 	bool handled = false;
++    if(NanoMenuEnabled() && !IsWindow() && NanoRowType()==NANO_ROW_GROUP)m_bWrapCursor=false;
+ 
+ 	if( !m_pItems.Count() )
+ 		return false;
+@@ -329,6 +331,7 @@
+ 
+ void CMenuItemsHolder::Draw( )
+ {
++    if(NanoMenuEnabled() && !IsWindow() && NanoRowType()==NANO_ROW_GROUP)NanoMenuArrangeRows(*this,m_scSize.w,m_scSize.h,nanoGroupScroll,2);
+ 	CMenuBaseItem *item;
+ 
+ 	// draw contents
+--- a/menus/PlayerSetup.cpp
++++ b/menus/PlayerSetup.cpp
+@@ -21,6 +21,7 @@
+ #include "Framework.h"
+ #include "Bitmap.h"
+ #include "PicButton.h"
++#include "../menus/nano-menu-layout.h"
+ #include "CheckBox.h"
+ #include "Slider.h"
+ #include "Field.h"
+@@ -99,6 +100,7 @@
+ 	class CMenuLogoPreview : public CMenuBaseItem
+ 	{
+ 	public:
++    NanoRowKind NanoRowType() const override{return NANO_ROW_PREVIEW;}
+ 		virtual void Draw();
+ 		HIMAGE hImage;
+ 		const byte ( *stripes )[3];
+@@ -125,6 +127,7 @@
+ 
+ void CMenuPlayerSetup::CMenuLogoPreview::Draw()
+ {
++    NanoMenuPreviewFrame frame(m_scPos,m_scSize,hImage?EngFuncs::PIC_Size(hImage):Size(1,1),font,szName);
+ 	if( !hImage )
+ 	{
+ 		// draw the background
+@@ -179,7 +182,7 @@
+ 
+ 	int textHeight = m_scPos.y - (m_scChSize * 1.5f);
+ 	uint textflags = ( iFlags & QMF_DROPSHADOW ) ? ETF_SHADOW : 0;
+-	UI_DrawString( font, m_scPos.x, textHeight, m_scSize.w, m_scChSize, szName, uiColorHelp, m_scChSize, QM_LEFT, textflags | ETF_FORCECOL | ETF_NOSIZELIMIT );
++	if(!NanoMenuEnabled())UI_DrawString( font, m_scPos.x, textHeight, m_scSize.w, m_scChSize, szName, uiColorHelp, m_scChSize, QM_LEFT, textflags | ETF_FORCECOL | ETF_NOSIZELIMIT );
+ 
+ 	// draw the rectangle
+ 	if( eFocusAnimation == QM_HIGHLIGHTIFFOCUS && IsCurrentSelected() )
+--- a/menus/ColorPickerDialog.h
++++ b/menus/ColorPickerDialog.h
+@@ -49,7 +49,8 @@
+ 	CEventCallback onOk;
+ 
+ private:
+-	void _Init() override;
++	int nanoColorScroll=0;
++    void _Init() override;
+ 	void _VidInit() override;
+ 	void Draw() override;
+ 	void Think() override;
+@@ -88,6 +89,7 @@
+ 	class CLogoPreview : public CMenuBaseItem
+ 	{
+ 	public:
++    NanoRowKind NanoRowType() const override{return NANO_ROW_PREVIEW;}
+ 		void Draw() override;
+ 		HIMAGE hImage = 0;
+ 		const byte ( *stripes )[3] = nullptr;
+@@ -99,6 +101,7 @@
+ 	{
+ 	public:
+ 		CSwatchRow();
++    NanoRowKind NanoRowType() const override{return NANO_ROW_ACTION;}
+ 		void Draw() override;
+ 		bool KeyDown( int key ) override;
+ 
+--- a/controls/ColorPicker.h
++++ b/controls/ColorPicker.h
+@@ -24,6 +24,7 @@
+ {
+ public:
+ 	CMenuColorPicker();
++    NanoRowKind NanoRowType() const override{return NANO_ROW_PREVIEW;}
+ 	virtual ~CMenuColorPicker();
+ 
+ 	void VidInit() override;
+--- a/menus/ColorPickerDialog.cpp
++++ b/menus/ColorPickerDialog.cpp
+@@ -14,6 +14,7 @@
+ */
+ 
+ #include "ColorPickerDialog.h"
++#include "nano-menu-layout.h"
+ #include "BaseMenu.h"
+ #include "extdll_menu.h"
+ #include "fmtstr.h"
+@@ -204,8 +205,12 @@
+ 
+ bool CMenuColorPickerDialog::CSwatchRow::KeyDown( int key )
+ {
+-	if( key != K_MOUSE1 )
+-		return false;
++	if(NanoMenuEnabled() && (UI::Key::IsLeftArrow(key) || UI::Key::IsRightArrow(key))) {
++        *selected=bound(0,*selected+(UI::Key::IsLeftArrow(key)?-1:1),*stripeCount-1);
++        if(onSwatchSelected)onSwatchSelected(this);return true;
++    }
++    if( key != K_MOUSE1 )
++        return false;
+ 
+ 	const int count = *stripeCount;
+ 	for( int i = 0; i < count; i++ )
+@@ -372,6 +377,7 @@
+ 
+ void CMenuColorPickerDialog::_VidInit()
+ {
++    if(NanoMenuEnabled()){SetCoord(0,0);SetSize((int)ceilf(ScreenWidth/uiStatic.scaleX),(int)ceilf(ScreenHeight/uiStatic.scaleY));return;}
+ 	SetRect( ( uiStatic.width - Layout::DLG_W ) / 2, ( Layout::UI_VIRTUAL_HEIGHT - Layout::DLG_H ) / 2, Layout::DLG_W, Layout::DLG_H );
+ 	pos.x += uiStatic.xOffset;
+ 	pos.y += uiStatic.yOffset;
+@@ -379,6 +385,17 @@
+ 
+ void CMenuColorPickerDialog::Draw()
+ {
++    if(NanoMenuEnabled()) {
++        SetCoord(0,0);SetSize((int)ceilf(ScreenWidth/uiStatic.scaleX),(int)ceilf(ScreenHeight/uiStatic.scaleY));CalcPosition();CalcSizes();
++        m_stripeCountSpin.szName=L("Stripes");m_presetSpin.szName=L("Preset");m_orientationSpin.szName=L("Direction");m_modeSwitch.szName=L("Colour mode");
++        const char *rgbNames[]={"Red","Green","Blue"},*hsvNames[]={"Hue","Saturation","Value"};
++        for(int i=0;i<3;++i)m_fields[i].szName=m_modeRGB?rgbNames[i]:hsvNames[i];
++        // Physical buttons edit the numeric fields; the mouse colour plane remains a visual reference.
++        m_picker.iFlags|=QMF_INACTIVE;
++        NanoMenuArrangeRows(*this,ScreenWidth,ScreenHeight,nanoColorScroll,8);
++        EngFuncs::FillRGBA(0,0,ScreenWidth,ScreenHeight,20,20,20,255);
++        BaseClass::Draw();return;
++    }
+ 	UI_FillRect( 0, 0, gpGlobals->scrWidth, gpGlobals->scrHeight, 0x40000000 );
+ 
+ 	EngFuncs::FillRGBA( m_scPos.x, m_scPos.y, m_scSize.w, m_scSize.h, 20, 20, 20, 235 );
+@@ -415,6 +432,7 @@
+ 
+ void CMenuColorPickerDialog::CLogoPreview::Draw()
+ {
++    NanoMenuPreviewFrame frame(m_scPos,m_scSize,hImage?EngFuncs::PIC_Size(hImage):Size(1,1),font,szName);
+ 	if( !hImage )
+ 	{
+ 		UI_FillRect( m_scPos, m_scSize, uiPromptBgColor );

@@ -1,0 +1,72 @@
+--- a/engine/client/cl_main.c
++++ b/engine/client/cl_main.c
+@@ -3430,9 +3430,37 @@
+ 	return retval;
+ }
+ 
++// Only redraw the loading menu while a Nano client is precaching. This avoids
++// rendering an incomplete world, and limits framebuffer work to four updates/sec.
++static void CL_NanoResourceProgress( int completed, int total, double *nextDraw, qboolean force )
++{
++    double now;
++    if( cls.state == ca_active || cl.background || !ref.initialized || !Cvar_VariableValue( "nano_hud_profile" ))
++        return;
++    Cvar_SetValue( "scr_loading", total > 0 ? 100.0f * completed / total : 0.0f );
++    now = Platform_DoubleTime();
++    if( !force && now < *nextDraw ) return;
++    *nextDraw = now + 0.25;
++    ref.dllFuncs.R_BeginFrame( false );
++    ref.dllFuncs.R_Set2DMode( true );
++    UI_UpdateMenu( host.realtime );
++    ref.dllFuncs.R_EndFrame();
++}
++
+ qboolean CL_PrecacheResources( void )
+ {
+ 	resource_t	*pRes;
++    int nanoTotal=0,nanoCompleted=0;
++    double nanoNextDraw=0;
++    qboolean nanoLoading=cls.state!=ca_active && !cl.background && Cvar_VariableValue("nano_hud_profile");
++    if(nanoLoading) {
++        for(pRes=cl.resourcesonhand.pNext;pRes && pRes!=&cl.resourcesonhand;pRes=pRes->pNext) {
++            ++nanoTotal;
++            if(FBitSet(pRes->ucFlags,RES_PRECACHED))++nanoCompleted;
++        }
++        UI_ConnectionProgress_Precache();
++        CL_NanoResourceProgress(nanoCompleted,nanoTotal,&nanoNextDraw,true);
++    }
+ 
+ 	// if we downloaded new WAD files or any other archives they must be added to searchpath
+ 	if( CL_ShouldRescanFilesystem( ))
+@@ -3449,6 +3477,7 @@
+ 
+ 		cl.models[pRes->nIndex] = Mod_LoadWorld( pRes->szFileName, true );
+ 		SetBits( pRes->ucFlags, RES_PRECACHED );
++        if(nanoLoading)CL_NanoResourceProgress(++nanoCompleted,nanoTotal,&nanoNextDraw,false);
+ 		cl.nummodels = 1;
+ 		break;
+ 	}
+@@ -3464,6 +3493,7 @@
+ 			cl.models[pRes->nIndex] = Mod_ForName( pRes->szFileName, false, false );
+ 			cl.nummodels = Q_max( cl.nummodels, pRes->nIndex + 1 );
+ 			SetBits( pRes->ucFlags, RES_PRECACHED );
++        if(nanoLoading)CL_NanoResourceProgress(++nanoCompleted,nanoTotal,&nanoNextDraw,false);
+ 
+ 			if( cl.models[pRes->nIndex] == NULL )
+ 			{
+@@ -3572,6 +3602,7 @@
+ 		}
+ 
+ 		SetBits( pRes->ucFlags, RES_PRECACHED );
++        if(nanoLoading)CL_NanoResourceProgress(++nanoCompleted,nanoTotal,&nanoNextDraw,false);
+ 	}
+ 
+ 	// make sure modelcount is in-range
+@@ -3581,6 +3612,7 @@
+ 	if( cls.state != ca_active )
+ 		S_EndRegistration();
+ 
++    if(nanoLoading)CL_NanoResourceProgress(nanoCompleted,nanoTotal,&nanoNextDraw,true);
+ 	return true;
+ }
+ 

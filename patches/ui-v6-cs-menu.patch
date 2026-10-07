@@ -1,0 +1,93 @@
+--- a/controls/ProgressBar.cpp
++++ b/controls/ProgressBar.cpp
+@@ -42,23 +42,27 @@
+ 	m_szCvarName = NULL;
+ }
+ 
++float CMenuProgressBar::GetValue() const
++{
++    if(m_szCvarName && m_flMax>m_flMin)
++        return bound(0.0f,(EngFuncs::GetCvarFloat(m_szCvarName)-m_flMin)/(m_flMax-m_flMin),1.0f);
++    return m_flValue;
++}
++
+ void CMenuProgressBar::Draw( void )
+ {
+-	float flProgress;
+-
+-	if( m_szCvarName )
+-	{
+-		flProgress = bound( m_flMin, EngFuncs::GetCvarFloat( m_szCvarName ), m_flMax );
+-		flProgress = ( flProgress - m_flMin ) / ( m_flMax - m_flMin );
+-	}
+-	else
+-	{
+-		flProgress = m_flValue;
+-	}
++    float flProgress=GetValue();
+ 
+     if(NanoThemeEnabled()) {
+-        UI_FillRect(m_scPos,m_scSize,NanoThemeField());
+-        UI_FillRect(m_scPos.x+2,m_scPos.y+2,Q_max(0,(int)((m_scSize.w-4)*flProgress)),Q_max(0,m_scSize.h-4),NanoThemeAccent());
++        NanoThemeBevel(m_scPos.x,m_scPos.y,m_scSize.w,m_scSize.h,NanoThemeField(),true);
++        int inner=Q_max(0,m_scSize.w-4),width=(int)(inner*flProgress),offset=0;
++        if(flProgress<=0 && inner>0) {
++            // An unmeasured server-start stage is busy, rather than 0% complete.
++            width=Q_max(1,inner/4);
++            float phase=fmodf(uiStatic.realTime*0.8f,2.0f);
++            offset=(int)((inner-width)*(phase<1.0f?phase:2.0f-phase));
++        }
++        UI_FillRect(m_scPos.x+2+offset,m_scPos.y+2,width,Q_max(0,m_scSize.h-4),NanoThemeAccent());
+         return;
+     }
+ 	// draw the background
+--- a/controls/ProgressBar.h
++++ b/controls/ProgressBar.h
+@@ -26,6 +26,7 @@
+ 	void Draw( void ) override;
+ 	void LinkCvar( const char *cvName, float flMin, float flMax );
+ 	void SetValue( float flValue );
++	float GetValue() const;
+ 
+ private:
+ 	float m_flMin, m_flMax, m_flValue;
+--- a/menus/ConnectionProgress.cpp
++++ b/menus/ConnectionProgress.cpp
+@@ -336,16 +336,27 @@
+     if(NanoMenuEnabled()) {
+         SetRect(0,0,(int)ceilf(ScreenWidth/uiStatic.scaleX),(int)ceilf(ScreenHeight/uiStatic.scaleY));CalcPosition();CalcSizes();DisableTransition();
+         NanoMenuDrawBackdrop();
+-        NanoThemeBevel(8,44,ScreenWidth-16,152,NanoThemePanel());
+-        title.SetNanoFont(14);commonText.SetNanoFont(14);downloadText.SetNanoFont(12);
+-        NanoMenuWrap(title.font,sTitleString,title.nanoLabel,sizeof(title.nanoLabel),ScreenWidth-32,14);title.szName=title.nanoLabel;
+-        const char *status=strcmp(sTitleString,sCommonString)?sCommonString:"Loading map and resources";
+-        NanoMenuWrap(commonText.font,status,commonText.nanoLabel,sizeof(commonText.nanoLabel),ScreenWidth-32,14);commonText.szName=commonText.nanoLabel;
+-        NanoMenuWrap(downloadText.font,sDownloadString,downloadText.nanoLabel,sizeof(downloadText.nanoLabel),ScreenWidth-32,12);downloadText.szName=downloadText.nanoLabel;
+-        NanoMenuRect(title,16,54,ScreenWidth-32,48);title.SetNanoFont(14);title.Draw();
+-        NanoMenuRect(commonText,16,106,ScreenWidth-32,48);commonText.SetNanoFont(14);commonText.Draw();
+-        NanoMenuRect(commonProgress,16,164,ScreenWidth-32,12);commonProgress.Draw();
+-        if(m_iState==STATE_DOWNLOAD){NanoMenuRect(downloadText,16,184,ScreenWidth-32,40);downloadText.SetNanoFont(12);downloadText.Draw();}
++        NanoThemeBevel(8,46,ScreenWidth-16,158,NanoThemePanel());
++        title.SetNanoFont(14);
++        char heading[256],status[512];
++        const char *caption=m_iSource==SOURCE_CREATEGAME?"Loading game":sTitleString;
++        NanoMenuWrap(title.font,caption,heading,sizeof(heading),ScreenWidth-40,14);
++        NanoMenuWrap(title.font,sCommonString,status,sizeof(status),ScreenWidth-40,14);
++        // Draw in the actual bounded rectangles: CMenuAction auto sizing otherwise
++        // centres the string inside its measured width instead of the panel.
++        UI_DrawString(title.font,20,58,ScreenWidth-40,34,heading,uiPromptTextColor,14,QM_CENTER,ETF_SHADOW|ETF_FORCECOL);
++        UI_DrawString(title.font,20,102,ScreenWidth-40,48,status,uiPromptTextColor,14,QM_CENTER,ETF_SHADOW|ETF_FORCECOL);
++        NanoMenuRect(commonProgress,20,158,ScreenWidth-40,14);commonProgress.Draw();
++        float progress=commonProgress.GetValue();
++        char detail[256];
++        if(m_iState==STATE_DOWNLOAD) {
++            NanoMenuWrap(title.font,sDownloadString,detail,sizeof(detail),ScreenWidth-40,12);
++        } else if(progress>0) {
++            snprintf(detail,sizeof(detail),"Resources: %d%%",(int)(progress*100+0.5f));
++        } else {
++            Q_strncpy(detail,"Please wait...",sizeof(detail));
++        }
++        UI_DrawString(title.font,20,180,ScreenWidth-40,22,detail,uiColorHelp,12,QM_CENTER,ETF_SHADOW|ETF_FORCECOL);
+         NanoMenuDrawLogo();
+         return;
+     }

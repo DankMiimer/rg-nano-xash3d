@@ -19,6 +19,10 @@ This repository contains source, patches, build recipes and tests. No prebuilt r
 
 Fresh assemblies default to **30 FPS in both games**, frame sleeping enabled and VSync disabled. The tested device has 30 FPS saved for Half-Life and 40 FPS for Counter-Strike. A cap is a maximum, not a guaranteed frame rate.
 
+UI profile v2 adapts the shared menus and native HUD canvas for the square display. See [UI changes and validation](docs/NANO-UI-V2.md) and [saved settings](docs/NANO-SETTINGS.md). A minimal update can be prepared with `tools/package_ui_update.py`; review the candidate and approve device changes before installation.
+
+The [native menu appearance layer](docs/NANO-UI-VISUAL.md) adds classic game colours, controls and prepared artwork, plus a three-entry Half-Life save browser and the real Valve intro with its original sound. ARM builds and host checks pass; this appearance layer awaits physical-device validation.
+
 ## Controls
 
 | Button | Action |
@@ -69,7 +73,7 @@ python3 tools/prepare_native.py \
 python3 tools/install.py --native
 ```
 
-The `--games` directory must contain `valve/` and `cstrike/`, including each `game.ico`. Supply a usable TrueType font; [Fira Sans](https://github.com/mozilla/Fira) is one option. `--nav` is optional, but without matching data bots may perform slow, memory-intensive map analysis. No NAV is supplied or downloaded.
+The `--games` directory must contain `valve/` and `cstrike/`, including each `game.ico`. Supply a usable TrueType font; [Fira Sans](https://github.com/mozilla/Fira) is one option. `--nav` imports one matching Dust NAV; `--nav-directory` imports matching NAVs for multiple maps. No NAV is supplied or downloaded. [Offline match setup](docs/CS-MATCH-SETUP.md) offers installed maps, 0–7 bots, four stock difficulties, team placement and advanced match settings. Bot analysis requires explicit opt-in; maps without NAVs can also be played with zero bots.
 
 Assembly requires a fresh output directory and creates `build/native-runtime/` plus launcher OPKs/icons in `build/native-dist/`. These private outputs include your game data and are excluded from Git. The OPKs are launchers, not standalone game packages.
 
@@ -83,7 +87,7 @@ The earlier SDL/XASH3DFS setup remains separate under `/mnt/FunKey/Xash3D`. Inst
 
 Physical-device feedback confirms rendering, menus, movement, shooting, immediate audio, controls, HUD layout and the original CS skybox. Bounded runs cover CS deaths/spectating/respawns and reloads, and HL saves/loads and several campaign transitions. See [VALIDATION.md](docs/VALIDATION.md) and [regression checks](docs/TESTING.md) for evidence and scope.
 
-These remain experimental ports on a device with very limited RAM. Loading and paging stalls persist. Full campaign coverage, arbitrary mods/maps and network multiplayer are not validated. Specialized dialogs and touch/gamepad editors retain upstream layouts. Targeted audio startup avoids the demonstrated broad mixer scan; the underlying firmware driver lock remains unresolved.
+These remain experimental ports on a device with very limited RAM. Loading and paging stalls persist. Full campaign coverage, arbitrary mods/maps and network multiplayer are not validated. The [native menu appearance](docs/NANO-UI-VISUAL.md) layer now has representative device checks; specialized touch/gamepad editors have limited hardware coverage. Targeted audio startup avoids the demonstrated broad mixer scan; the underlying firmware driver lock remains unresolved.
 
 Texture changes remove unused menu/sprite/model mips and share identical converted buffers, saving approximately **27 MiB of tracked allocation** in the tested CS scene while retaining base pixels and world mipmaps. This is not a whole-process RAM or guaranteed FPS saving. Large cleared allocations avoid eagerly touching unused pages. Controlled load tests showed improved colder medians, with overlapping warm results. See [MEMORY.md](docs/MEMORY.md), [DEMAND-ZERO.md](docs/DEMAND-ZERO.md) and [LOAD-BENCHMARK.md](docs/LOAD-BENCHMARK.md).
 
@@ -102,3 +106,7 @@ Optional `NANO_PROFILE=1` enables frame timing without an overlay. Console comma
 Support tools and menu integration are GPL-3.0-or-later. Small aiming, HUD, crosshair, frame-statistics, texture-sharing, sky-projection and numeric-settings helpers are MIT, as marked in each file. Upstream code retains its applicable licenses. Half-Life SDK code remains under Valve's SDK terms, including free distribution and required notices. See [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [SOURCES.md](SOURCES.md) and `licenses/`.
 
 Credits: FWGS/Xash3D and HLSDK Portable contributors; Velaron/CS16Client; ReGameDLL_CS; FunKey-Project and firmware maintainers; DankMiimer/NanoCraft for the clock helper; and Sn3zee-cmds/XASH3DFS for the original packaged port that started this work. This independent project is unaffiliated with Valve or Anbernic.
+
+Optional face-button aiming in Nano settings: D-pad movement, face-button camera, L shoot and R modifier. See [controls](docs/CONTROLS.md).
+
+The optional aiming preset also supports Select + face buttons for quarter-speed aiming; tapping Select reloads.

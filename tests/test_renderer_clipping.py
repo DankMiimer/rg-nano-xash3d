@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from pathlib import Path
+import os
 root = Path(__file__).resolve().parents[1]
 base = root/'build/tests'
 base.mkdir(parents=True, exist_ok=True)
-source = (root / 'upstream/xash3d/ref/soft/r_draw.c').read_text()
+native=Path(os.environ.get('NANO_NATIVE_DIR',str(root/'upstream')))
+source=(native/'xash3d/ref/soft/r_draw.c').read_text()
 start = source.index('static void R_DrawStretchPicImplementation(')
 end = source.index('/*\n=============\nR_DrawStretchPic', start)
 function = source[start:end]
@@ -54,4 +56,4 @@ int main(void){
  puts("Renderer clipping: off-screen, zero-size, all edges and normal drawing passed.");
 }
 '''
-(base / 'renderer-clipping-test.c').write_text(prefix + function + suffix)
+(base / 'renderer-clipping-test.c').write_text((root/'src/nano-ui-alpha.h').read_text()+prefix+function+suffix)

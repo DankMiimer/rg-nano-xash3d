@@ -36,6 +36,13 @@ def apply(target, filename):
     run('git', 'apply', '--check', str(patch), cwd=target)
     run('git', 'apply', str(patch), cwd=target)
 
+def remove_layer(target, filename):
+    """Temporarily remove a verified dependent layer before checking older patches."""
+    patch=ROOT/'patches'/filename
+    applied=subprocess.run(['git','apply','--reverse','--check',str(patch)],cwd=target,capture_output=True)
+    if applied.returncode==0:run('git','apply','--reverse',str(patch),cwd=target)
+
+
 def apply_stack(target, filenames):
     """Reapply overlapping dependent patches without resetting other edits."""
     for filename in reversed(filenames):
@@ -54,12 +61,23 @@ if __name__ == '__main__':
     apply(renderer, 'renderer-nano-skybox.patch')
     shutil.copy2(ROOT/'src/nano-skybox.h', renderer/'ref/soft/nano-skybox.h')
     client=fetch('cs16-client')
+    remove_layer(client,'ui-v6-cs-client.patch')
+    remove_layer(client,'ui-v5-cs-client.patch')
+    remove_layer(client,'ui-v3-cs-client.patch')
+    remove_layer(client/'3rdparty/mainui_cpp','ui-v6-cs-menu.patch')
+    remove_layer(client/'3rdparty/mainui_cpp','ui-v5-cs-menu.patch')
+    remove_layer(client/'3rdparty/mainui_cpp','ui-v4-cs-menu.patch')
+    remove_layer(client/'3rdparty/mainui_cpp','ui-v3-cs-menu.patch')
+    remove_layer(client/'3rdparty/ReGameDLL_CS','ui-v3-cs-server.patch')
+    remove_layer(client,'ui-v2-cs-client.patch')
     apply(client, 'cs16-nano-4141.patch')
     apply(client, 'cs16-nano-spectator.patch')
     apply(client/"3rdparty/ReGameDLL_CS", "cs16-nav-bsp-path.patch")
-    apply(client/"3rdparty/mainui_cpp", "cs16-mainui-nano-menu.patch")
-    for header in ("nano-menu-options.h", "nano-settings.h"):
+    apply_stack(client/"3rdparty/mainui_cpp", ("cs16-mainui-nano-menu.patch", "cs16-nano-match-menu.patch", "ui-v2-cs-menu.patch", "ui-v3-cs-menu.patch", "ui-v4-cs-menu.patch", "ui-v5-cs-menu.patch", "ui-v6-cs-menu.patch"))
+    apply(client/"3rdparty/ReGameDLL_CS", "cs16-nano-nav-opt-in.patch")
+    apply(client/"3rdparty/ReGameDLL_CS", "ui-v3-cs-server.patch")
+    for header in ("nano-menu-options.h", "nano-settings.h", "nano-menu-match.h", "nano-match.h", "nano-menu-controls.h", "nano-control-preference.h", "nano-menu-layout.h", "nano-menu-theme.h"):
         shutil.copy2(ROOT/"src"/header,client/"3rdparty/mainui_cpp/menus"/header)
 
-    for patch in ("cs16-nano-look.patch", "cs16-nano-hud.patch"): apply(client,patch)
-    for header in ("nano-look.h", "nano-hud-scope.h", "nano-crosshair.h"): shutil.copy2(ROOT/"src"/header,client/"cl_dll"/header)
+    apply_stack(client,("cs16-nano-look.patch", "cs16-nano-centerview.patch", "cs16-nano-hud.patch", "cs16-nano-controls.patch", "cs16-nano-slow-aim.patch", "ui-v2-cs-client.patch", "ui-v3-cs-client.patch", "ui-v5-cs-client.patch", "ui-v6-cs-client.patch"))
+    for header in ("nano-look.h", "nano-hud-scope.h", "nano-crosshair.h", "nano-text-menu.h", "nano-hud-layout.h", "nano-bot-loading.h"): shutil.copy2(ROOT/"src"/header,client/"cl_dll"/header)

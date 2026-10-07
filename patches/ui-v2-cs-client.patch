@@ -1,0 +1,710 @@
+--- a/cl_dll/ammo.cpp
++++ b/cl_dll/ammo.cpp
+@@ -19,6 +19,8 @@
+ //
+ 
+ #include "hud.h"
++#include "nano-hud-layout.h"
++#include "nano-hud-scope.h"
+ #include "nano-hud-scope.h"
+ #include "nano-crosshair.h"
+ #include "cvardef.h"
+@@ -1105,6 +1107,43 @@
+ 
+ 	DrawUtils::ScaleColors(r, g, b, a );
+ 
++
++    if(NanoHudActive()) {
++        float scale=gEngfuncs.pfnGetCvarFloat("nano_hud_bottom");
++        int digitHeight=gHUD.m_iFontHeight;
++        wrect_t cross=gHUD.GetSpriteRect(gHUD.GetSpriteIndex("cross"));
++        float healthWidth=((cross.right-cross.left)/2.0f+3.5f*AmmoWidth)*scale;
++        int iconWidth=pw->rcAmmo.right-pw->rcAmmo.left;
++        int fullWidth=(pw->iClip>=0?6:3)*AmmoWidth+(pw->iClip>=0?4:1)+iconWidth;
++        bool split=pw->iClip>=0 && fullWidth*scale>ScreenWidth-12-healthWidth;
++        int modes[3],rows=0;
++        if(pw->iAmmoType>0){modes[rows++]=split?2:0;if(split)modes[rows++]=1;}
++        if(pw->iAmmo2Type>0 && gWR.CountAmmo(pw->iAmmo2Type)>0)modes[rows++]=3;
++        int inset=4;
++        for(int row=0;row<rows;row++) {
++            int mode=modes[row];bool secondary=mode==3,clipOnly=mode==2;
++            wrect_t rect=secondary?pw->rcAmmo2:pw->rcAmmo;
++            int iw=clipOnly?0:rect.right-rect.left,ih=clipOnly?digitHeight:rect.bottom-rect.top;
++            int height=ih>digitHeight?ih:digitHeight;
++            bool full=mode==0 && pw->iClip>=0;
++            int width=(full?6:3)*AmmoWidth+(full?4:1)+iw;
++            if(width*scale>ScreenWidth-12-healthWidth)inset=max(inset,(int)ceilf(2*digitHeight*scale)+12);
++            NanoHudScope rowScope("nano_hud_bottom",0,0);
++            rowScope.Place(0,0,width,height,1,1,4,inset);
++            int px=0,py=(height-digitHeight)/2;
++            if(full || clipOnly) {
++                px=DrawUtils::DrawHudNumber(px,py,iFlags|DHN_3DIGITS,pw->iClip,r,g,b);
++                if(full){FillRGBA(px+1,py,1,digitHeight,r,g,b,a);px+=3;}
++            }
++            if(!clipOnly) {
++                px=DrawUtils::DrawHudNumber(px,py,iFlags|DHN_3DIGITS,gWR.CountAmmo(secondary?pw->iAmmo2Type:pw->iAmmoType),r,g,b);
++                SPR_Set(secondary?pw->hAmmo2:pw->hAmmo,r,g,b);
++                SPR_DrawAdditive(0,px+1,(height-ih)/2,&rect);
++            }
++            inset+=(int)ceilf(height*scale)+4;
++        }
++        return 1;
++    }
+ 	// Does this weapon have a clip?
+ 	y = ScreenHeight - gHUD.m_iFontHeight - gHUD.m_iFontHeight/2;
+ 	bool nanoCompact = gEngfuncs.pfnGetCvarFloat("nano_hud_profile") != 0;
+--- a/cl_dll/battery.cpp
++++ b/cl_dll/battery.cpp
+@@ -119,8 +119,8 @@
+ 	int dw = gHUD.GetSpriteRect(gHUD.m_HUD_number_0).Width();
+ 	int cw = gHUD.GetSpriteRect(gHUD.GetSpriteIndex("cross")).Width();
+ 	float size = gEngfuncs.pfnGetCvarFloat("nano_hud_bottom");
+-	nanoScope.Place(x, y, x+m_hEmpty[m_enArmorType].rect.Width()+3*dw,
+-		y+max(gHUD.m_iFontHeight,m_iHeight), 0, 1, 6+(cw/2.0f+3.5f*dw)*size, 2);
++	nanoScope.Place(x,y,x+m_hEmpty[m_enArmorType].rect.Width()+3*dw,
++            y+max(gHUD.m_iFontHeight,m_iHeight),0,1,4,8+ceilf(gHUD.m_iFontHeight*size));
+ 
+ 	// make sure we have the right sprite handles
+ 	SPR_Set( m_hFull[m_enArmorType].spr, r, g, b );
+--- a/cl_dll/hud_redraw.cpp
++++ b/cl_dll/hud_redraw.cpp
+@@ -17,6 +17,8 @@
+ //
+ #include <math.h>
+ #include "hud.h"
++#include "nano-hud-layout.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "triangleapi.h"
+ 
+@@ -83,6 +85,9 @@
+ // returns 1 if they've changed, 0 otherwise
+ int CHud :: Redraw( float flTime, int intermission )
+ {
++    if(NanoHudActive() && m_scrinfo.iCharHeight!=NanoHudTextHeight())gEngfuncs.pfnGetScreenInfo(&m_scrinfo);
++    gEngfuncs.Cvar_SetValue("nano_observing",g_iUser1!=0);
++
+ 	m_fOldTime = m_flTime;	// save time of previous redraw
+ 	m_flTime = flTime;
+ 	m_flTimeDelta = (double)m_flTime - m_fOldTime;
+--- a/cl_dll/hud/timer.cpp
++++ b/cl_dll/hud/timer.cpp
+@@ -57,7 +57,7 @@
+ 
+ int CHudTimer::Draw( float fTime )
+ {
+-	NanoHudScope nanoScope("nano_hud_bottom", 0.5, 1);
++	NanoHudScope nanoScope("nano_hud_bottom", 0.5, 0);
+ 
+ 	if( gHUD.m_iHideHUDDisplay & ( HIDEHUD_TIMER | HIDEHUD_ALL ) )
+ 		return 1;
+@@ -101,8 +101,7 @@
+ 	int x = (ScreenWidth - totalWidth) / 2;
+ 	int y = ScreenHeight - 1.5 * gHUD.m_iFontHeight;
+ 
+-	nanoScope.Place(x, y, x+totalWidth, y+gHUD.m_iFontHeight, 0.5, 1, 2,
+-		6+gHUD.m_iFontHeight*gEngfuncs.pfnGetCvarFloat("nano_hud_bottom"));
++	nanoScope.Place(x,y,x+totalWidth,y+gHUD.m_iFontHeight,0.5,0,4,4);
+ 
+ 	SPR_Set(gHUD.GetSprite(m_HUD_timer), r, g, b);
+ 	SPR_DrawAdditive(0, x, y, &gHUD.GetSpriteRect(m_HUD_timer));
+--- a/cl_dll/hud/money.cpp
++++ b/cl_dll/hud/money.cpp
+@@ -88,10 +88,10 @@
+ 	int y = MONEY_YPOS;
+ 	bool nanoTop = gEngfuncs.pfnGetCvarFloat("nano_hud_profile") != 0;
+ 	int balanceWidth = iDollarWidth+5*gHUD.GetSpriteRect(gHUD.m_HUD_number_0).Width();
+-	nanoScope.Place(x, y, x+balanceWidth, y+max(m_hDollar.rect.Height(),gHUD.m_iFontHeight), 1, 0);
++	nanoScope.Place(x,y,x+balanceWidth,y+max(m_hDollar.rect.Height(),gHUD.m_iFontHeight),1,0,4,8+ceilf(gHUD.m_iFontHeight*gEngfuncs.pfnGetCvarFloat("nano_hud_bottom")));
+ 	// The balance stays on the top edge; transient changes use the space to its left.
+-	int deltaX = nanoTop ? x-balanceWidth-6 : x;
+-	int deltaY = nanoTop ? y : y-m_hDollar.rect.Height()*1.5f;
++	int deltaX = x;
++	int deltaY = nanoTop ? y+gHUD.m_iFontHeight+5 : y-m_hDollar.rect.Height()*1.5f;
+ 
+ 	if( m_iBlinkAmt )
+ 	{
+--- a/cl_dll/saytext.cpp
++++ b/cl_dll/saytext.cpp
+@@ -19,6 +19,8 @@
+ //
+ 
+ #include "hud.h"
++#include "nano-hud-layout.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ 
+@@ -38,7 +40,7 @@
+ #define MAX_CHARS_PER_LINE	1024  /* it can be less than this, depending on char size */
+ 
+ // allow 20 pixels on either side of the text
+-#define MAX_LINE_WIDTH  ( ScreenWidth - 40 )
++#define MAX_LINE_WIDTH  ( ScreenWidth - 16 )
+ #define LINE_START  10
+ 
+ static void StripSayTextControlCodes( const char *src, char *dst, int dstSize )
+@@ -116,7 +118,7 @@
+ 
+ int CHudSayText :: Draw( float flTime )
+ {
+-	int y = Y_START;
++	int y=NanoHudActive()?NanoTop():Y_START;
+ 
+ 	//if ( ( gViewPort && gViewPort->AllowedToPrintText() == FALSE) || !m_HUD_saytext->value )
+ 	if ( !m_HUD_saytext->value )
+@@ -425,8 +427,32 @@
+ 
+ }
+ 
++static int NanoSayWidth(const char *text) {
++    char plain[1024];int n=0;
++    for(;*text && n<1023;text++)if(*text!=1 && *text!=3 && *text!=4)plain[n++]=*text;
++    plain[n]=0;return DrawUtils::ConsoleStringLen(plain);
++}
++int CHudSayText::NanoTop() const {
++    int count=0;for(int i=0;i<MAX_LINES;i++)if(g_szLineBuffer[i][0])++count;
++    if(!count)return ScreenHeight+1;
++    return ScreenHeight-(int)ceilf(2*gHUD.m_iFontHeight*gEngfuncs.pfnGetCvarFloat("nano_hud_bottom"))-16-count*(NanoHudTextHeight()+2);
++}
+ void CHudSayText :: EnsureTextFitsInOneLineAndWrapIfHaveTo( int line )
+ {
++    if(NanoHudActive()) {
++        char rows[MAX_LINES][1024];
++        int count=NanoHudWrap(g_szLineBuffer[line],rows,MAX_LINES,ScreenWidth-LINE_START-12,NanoSayWidth);
++        float *color=g_pflNameColors[line];
++        while(line+count>MAX_LINES)line-=ScrollTextUp();
++        if(line<0)return;
++        for(int row=0;row<count;row++) {
++            int i=line+row;g_szLineBuffer[i][0]=0;
++            if(row)strlcpy(g_szLineBuffer[i]," ",sizeof(g_szLineBuffer[i]));
++            strlcat(g_szLineBuffer[i],rows[row],sizeof(g_szLineBuffer[i]));
++            g_pflNameColors[i]=color;g_iNameLengths[i]=0;
++        }
++        line_height=NanoHudTextHeight()+2;return;
++    }
+ 	int line_width = 0;
+ 	DrawUtils::ConsoleStringSize(g_szLineBuffer[line], &line_width, &line_height );
+ 
+--- a/cl_dll/menu.cpp
++++ b/cl_dll/menu.cpp
+@@ -18,6 +18,8 @@
+ // generic menu handler
+ //
+ #include "hud.h"
++#include "nano-hud-layout.h"
++#include "nano-hud-scope.h"
+ #include "keydefs.h"
+ #include "nano-text-menu.h"
+ #include "nano-hud-scope.h"
+@@ -86,6 +88,7 @@
+ 	return 1;
+ }
+ 
++static int NanoHudStringWidth(const char *text) {return DrawUtils::HudStringLen(text);}
+ int CHudMenu :: Draw( float flTime )
+ {
+ 	NanoHudScope nanoScope("nano_hud_menu", 0, 0.5);
+@@ -115,12 +118,28 @@
+ 			nlc++;
+ 	}
+ 
+-    if(gEngfuncs.pfnGetCvarFloat("nano_control_scheme")==1) {
+-        NanoHudScope hintScope("nano_hud_menu",0,1);
++
++    if(NanoHudActive()) {
++        char lines[24][1024];
++        int count=NanoHudWrap(g_szMenuString,lines,24,ScreenWidth-16,NanoHudStringWidth);
++        int selectedLine=-1;
+         m_nanoSelection=NanoMenuSelection(m_bitsValidSlots,m_nanoSelection,0);
+-        char hint[48];snprintf(hint,sizeof(hint),"D-pad: %d  A: pick  B: back",m_nanoSelection==10?0:m_nanoSelection);
+-        DrawUtils::DrawHudString(8,ScreenHeight-20,ScreenWidth,hint,255,200,0);
++        for(int row=0;row<count;row++) {
++            const char *p=lines[row];while((*p=='\\' && p[1] && strchr("ywrd",p[1])) || (*p=='^' && p[1]>='0' && p[1]<='9'))p+=2;while(*p==' ')p++;
++            if(*p>='0' && *p<='9') {int slot=*p=='0'?10:*p-'0';if(slot==m_nanoSelection)selectedLine=row;}
++        }
++        int pitch=NanoHudTextHeight()+6,visible=(ScreenHeight-16)/pitch;
++        int first=selectedLine>=visible?selectedLine-visible+1:0;
++        first=min(first,max(0,count-visible));
++        FillRGBABlend(4,4,ScreenWidth-8,ScreenHeight-8,0,0,0,210);
++        int top=8;
++        for(int row=first;row<count && row<first+visible;row++,top+=pitch) {
++            if(row==selectedLine)FillRGBA(4,top-2,ScreenWidth-8,pitch,80,60,0,160);
++            DrawUtils::DrawHudString(8,top,ScreenWidth-8,lines[row],255,200,0);
++        }
++        return 1;
+     }
++
+ 	// center it
+ 	int y = (ScreenHeight/2) - ((nlc/2)*12) - 40; // make sure it is above the say text
+ 	int x = 20;
+--- a/cl_dll/text_message.cpp
++++ b/cl_dll/text_message.cpp
+@@ -21,6 +21,8 @@
+ //
+ 
+ #include "hud.h"
++#include "nano-hud-layout.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include <string.h>
+ #include <stdio.h>
+@@ -221,9 +223,13 @@
+ 
+ 		int len = DrawUtils::ConsoleStringLen( psz );
+ 
+-		DrawUtils::DrawConsoleString( (ScreenWidth - len) / 2, ScreenHeight / 3, psz );
+-
+-		CenterPrint( psz );
++		if(NanoHudActive()) {
++            strncpy(nanoCenterText,psz,sizeof(nanoCenterText)-1);nanoCenterText[sizeof(nanoCenterText)-1]=0;
++            nanoCenterUntil=gHUD.m_flTime+max(0.0f,gEngfuncs.pfnGetCvarFloat("scr_centertime"));
++            m_iFlags|=HUD_DRAW;gEngfuncs.Cvar_SetValue("nano_hud_objective_until",nanoCenterUntil);
++        } else DrawUtils::DrawConsoleString((ScreenWidth-len)/2,ScreenHeight/3,psz);
++
++		if(!NanoHudActive())CenterPrint(psz);
+ 		break;
+ 	}
+ 	case HUD_PRINTNOTIFY:
+@@ -256,3 +262,15 @@
+ 
+ 	return 1;
+ }
++
++void CHudTextMessage::InitHUDData() {nanoCenterText[0]=0;nanoCenterUntil=0;m_iFlags=0;}
++int CHudTextMessage::Draw(float time) {
++    if(!NanoHudActive() || time>=nanoCenterUntil){m_iFlags=0;return 1;}
++    if(gEngfuncs.pfnGetCvarFloat("nano_text_menu"))return 1;
++    float scale=(NanoHudTextHeight()+2.0f)/NanoHudTextHeight();
++    char lines[8][1024];int count=NanoHudWrap(nanoCenterText,lines,8,(ScreenWidth-16)/scale,DrawUtils::ConsoleStringLen);
++    NanoHudScope scope(scale,0.5f,0.5f);
++    int pitch=NanoHudTextHeight(),top=ScreenHeight/2-count*pitch/2;
++    for(int row=0;row<count;row++)DrawUtils::DrawConsoleString((ScreenWidth-DrawUtils::ConsoleStringLen(lines[row]))/2,top+row*pitch,lines[row]);
++    return 1;
++}
+--- a/cl_dll/death.cpp
++++ b/cl_dll/death.cpp
+@@ -16,6 +16,8 @@
+ // death notice
+ //
+ #include "hud.h"
++#include "nano-hud-layout.h"
++#include "nano-hud-scope.h"
+ #include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+@@ -84,6 +86,7 @@
+ 	NanoHudScope nanoScope("nano_hud_identity", 0, 0);
+ 	bool nanoTop = gEngfuncs.pfnGetCvarFloat("nano_hud_profile") != 0;
+ 	int x, y, r, g, b, i;
++    char killer[128],victim[128];
+ 
+ 	for( i = 0; i < MAX_DEATHNOTICES; i++ )
+ 	{
+@@ -114,24 +117,33 @@
+ 				y = ScreenHeight / 5 + 2 + (20 * i);
+ 			}
+ 
+-			if (nanoTop && !g_iUser1) {
+-				int moneyHeight = max(gHUD.m_iFontHeight, gHUD.GetSpriteRect(gHUD.GetSpriteIndex("dollar")).Height());
+-				y = (int)ceilf(2 + moneyHeight*gEngfuncs.pfnGetCvarFloat("nano_hud_side") + 5) + 20*i;
+-			}
++            if(nanoTop) y=NanoHudTopEnd()+i*max(20,NanoHudTextHeight()+4);
++            if(nanoTop && y+max(20,NanoHudTextHeight())>gHUD.m_SayText.NanoTop())continue;
++            if(nanoTop && gEngfuncs.pfnGetCvarFloat("nano_hud_objective_until")>flTime && y+NanoHudTextHeight()>ScreenHeight/2-20)continue;
+ 
+ 			int id = (rgDeathNoticeList[i].iId == -1) ? m_HUD_d_skull : rgDeathNoticeList[i].iId;
+-			x = ScreenWidth - (nanoTop ? 2 : 0) - DrawUtils::ConsoleStringLen(rgDeathNoticeList[i].szVictim) - (gHUD.GetSpriteRect(id).Width());
++            const char *killerName=rgDeathNoticeList[i].szKiller,*victimName=rgDeathNoticeList[i].szVictim;
++            if(nanoTop) {
++                int icons=gHUD.GetSpriteRect(id).Width()+(rgDeathNoticeList[i].iHeadShotId?gHUD.GetSpriteRect(m_HUD_d_headshot).Width():0);
++                int available=ScreenWidth-icons-16;
++                int victimWidth=rgDeathNoticeList[i].bSuicide?available:available/2;
++                NanoHudFit(victimName,victim,sizeof(victim),victimWidth,DrawUtils::ConsoleStringLen);
++                NanoHudFit(killerName,killer,sizeof(killer),available-DrawUtils::ConsoleStringLen(victim)-5,DrawUtils::ConsoleStringLen);
++                killerName=killer;victimName=victim;
++            }
++
++			x = ScreenWidth - (nanoTop ? 2 : 0) - DrawUtils::ConsoleStringLen(victimName) - (gHUD.GetSpriteRect(id).Width());
+ 			if( rgDeathNoticeList[i].iHeadShotId )
+ 				x -= gHUD.GetSpriteRect(m_HUD_d_headshot).Width();
+ 
+ 			if ( !rgDeathNoticeList[i].bSuicide )
+ 			{
+-				x -= (5 + DrawUtils::ConsoleStringLen( rgDeathNoticeList[i].szKiller ) );
++				x -= (5 + DrawUtils::ConsoleStringLen(killerName) );
+ 
+ 				// Draw killers name
+ 				if ( rgDeathNoticeList[i].KillerColor )
+ 					DrawUtils::SetConsoleTextColor( rgDeathNoticeList[i].KillerColor[0], rgDeathNoticeList[i].KillerColor[1], rgDeathNoticeList[i].KillerColor[2] );
+-				x = 5 + DrawUtils::DrawConsoleString( x, y, rgDeathNoticeList[i].szKiller );
++				x = 5 + DrawUtils::DrawConsoleString(x,y,killerName);
+ 			}
+ 
+ 			r = 255;  g = 80;	b = 0;
+@@ -158,7 +170,7 @@
+ 			{
+ 				if ( rgDeathNoticeList[i].VictimColor )
+ 					DrawUtils::SetConsoleTextColor( rgDeathNoticeList[i].VictimColor[0], rgDeathNoticeList[i].VictimColor[1], rgDeathNoticeList[i].VictimColor[2] );
+-				x = DrawUtils::DrawConsoleString( x, y, rgDeathNoticeList[i].szVictim );
++				x = DrawUtils::DrawConsoleString(x,y,victimName);
+ 			}
+ 		}
+ 	}
+--- a/cl_dll/message.cpp
++++ b/cl_dll/message.cpp
+@@ -19,6 +19,8 @@
+ //
+ 
+ #include "hud.h"
++#include "nano-hud-layout.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include <string.h>
+ #include <stdio.h>
+@@ -251,8 +253,21 @@
+ }
+ 
+ 
++static int NanoMessageWidth(const char *text) {return DrawUtils::HudStringLen(text);}
+ void CHudMessage::MessageDrawScan( client_textmessage_t *pMessage, float time )
+ {
++    if(NanoHudActive() && gEngfuncs.pfnGetCvarFloat("nano_text_menu"))return;
++    char nanoLines[8][1024],wrapped[8192];client_textmessage_t nanoMessage;
++    float size=NanoHudActive()?(NanoHudTextHeight()+2.0f)/NanoHudTextHeight():1;
++    NanoHudScope nanoScope(size,0.5f,0.5f);
++    if(NanoHudActive()) {
++        int count=NanoHudWrap(pMessage->pMessage,nanoLines,8,(ScreenWidth-16)/size,NanoMessageWidth);
++        wrapped[0]=0;
++        for(int row=0;row<count;row++){strcat(wrapped,nanoLines[row]);if(row+1<count)strcat(wrapped,"\n");}
++        nanoMessage=*pMessage;nanoMessage.pMessage=wrapped;pMessage=&nanoMessage;
++        gEngfuncs.Cvar_SetValue("nano_hud_objective_until",gHUD.m_flTime+0.1f);
++    }
++
+ 	int i, j, length, width;
+ 	const char *pText;
+ 	unsigned char line[512];
+@@ -456,6 +471,7 @@
+ 
+ void CHudMessage::MessageAdd( const char *pName, float time, qboolean hintMessage/*, unsigned int font */ )
+ {
++    if(NanoHudActive() && pName && !strcmp(pName,"#Spec_Duck"))return;
+ 	int i, j;
+ 	client_textmessage_t *tempMessage;
+ 	client_textmessage_t *message;
+--- a/cl_dll/hud.h
++++ b/cl_dll/hud.h
+@@ -376,6 +376,9 @@
+ 	void GetAllPlayersInfo( void );
+ 
+ 	bool ShouldDrawScoreboard() const;
++    int NanoDraw();
++    int NanoKey(int down,int key);
++    int nanoPage=0;
+ 
+ 	CHudUserCmd(ShowScores);
+ 	CHudUserCmd(HideScores);
+@@ -559,6 +562,7 @@
+ class CHudSayText : public CHudBase
+ {
+ public:
++    int NanoTop() const;
+ 	int Init( void );
+ 	void InitHUDData( void );
+ 	int VidInit( void );
+@@ -662,6 +666,10 @@
+ class CHudTextMessage: public CHudBase
+ {
+ public:
++    int Draw(float time);
++    void InitHUDData();
++    char nanoCenterText[1024]={0};
++    float nanoCenterUntil=0;
+ 	int Init( void );
+ 	static char *LocaliseTextString( const char *msg, char *dst_buffer, int buffer_size );
+ 	static char *BufferedLocaliseTextString( const char *msg );
+@@ -911,6 +919,10 @@
+ class CHudSpectatorGui: public CHudBase
+ {
+ public:
++    int NanoDraw();
++    int NanoKey(int down,int key);
++    int NanoEntries(const char **names,const char **commands);
++    int nanoCursor=0;
+ 	int Init();
+ 	int VidInit();
+ 	int Draw( float flTime );
+--- a/cl_dll/hud/spectator_gui.cpp
++++ b/cl_dll/hud/spectator_gui.cpp
+@@ -30,6 +30,9 @@
+ #include <string.h>
+ 
+ #include "hud.h"
++#include "keydefs.h"
++#include "nano-hud-layout.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ 
+@@ -176,6 +179,7 @@
+ 
+ 	// function name says it
+ 	CalcAllNeededData( );
++    if(NanoHudActive())return NanoDraw();
+ 
+ 	int r = 255, g = 140, b = 0;
+ 
+@@ -475,6 +479,8 @@
+ 
+ void CHudSpectatorGui::UserCmd_ToggleSpectatorMenu()
+ {
++    if(NanoHudActive()){m_menuFlags=(m_menuFlags&ROOT_MENU)||!g_iUser1?0:ROOT_MENU;nanoCursor=0;gEngfuncs.Cvar_SetValue("nano_text_menu",m_menuFlags!=0);return;}
++
+ 	static byte color[4] = {0, 0, 0, 0};
+ 
+ 	if( !g_iMobileAPIVersion )
+@@ -510,6 +516,8 @@
+ 
+ void CHudSpectatorGui::UserCmd_ToggleSpectatorMenuOptions()
+ {
++    if(NanoHudActive()){m_menuFlags^=MENU_OPTIONS;nanoCursor=0;return;}
++
+ 	static byte color[4] = {0, 0, 0, 0};
+ 
+ 	if( !(m_menuFlags & ROOT_MENU) || !g_iMobileAPIVersion )
+@@ -541,6 +549,8 @@
+ 
+ void CHudSpectatorGui::UserCmd_ToggleSpectatorMenuOptionsSettings()
+ {
++    if(NanoHudActive()){m_menuFlags^=MENU_OPTIONS_SETTINGS;nanoCursor=0;return;}
++
+ 	static byte color[4] = {0, 0, 0, 0};
+ 
+ 	if( !(m_menuFlags & ROOT_MENU) || !g_iMobileAPIVersion )
+@@ -567,6 +577,8 @@
+ 
+ void CHudSpectatorGui::UserCmd_ToggleSpectatorMenuSpectateOptions()
+ {
++    if(NanoHudActive()){m_menuFlags^=MENU_SPEC_OPTIONS;nanoCursor=0;return;}
++
+ 	static byte color[4] = {0, 0, 0, 0};
+ 
+ 	if( !(m_menuFlags & ROOT_MENU) || !g_iMobileAPIVersion )
+@@ -594,3 +606,74 @@
+ 		gMobileAPI.pfnTouchRemoveButton( "_spec_spec_*" );
+ 	}
+ }
++
++static int NanoSpectatorWidth(const char *text){return DrawUtils::HudStringLen(text);}
++int CHudSpectatorGui::NanoEntries(const char **names,const char **commands)
++{
++    static const char *rootNames[]={"Options","Previous player","Next player","Camera mode","Close"};
++    static const char *rootCommands[]={"_spec_toggle_menu_options","_spec_find_next_player_reverse","_spec_find_next_player","_spec_toggle_menu_spectate_options","_spec_toggle_menu"};
++    static const char *cameraNames[]={"Chase map overview","Free map overview","First person","Free look","Free chase camera","Locked chase camera","Back"};
++    static const char *cameraCommands[]={"spec_mode 6","spec_mode 5","spec_mode 4","spec_mode 3","spec_mode 2","spec_mode 1","_spec_toggle_menu_spectate_options"};
++    static const char *optionNames[]={"Settings","Autodirector","Show scores","Picture-in-picture (off)","Help","Back"};
++    static const char *optionCommands[]={"_spec_toggle_menu_options_settings","spec_autodirector t","showscoreboard2","","spec_help","_spec_toggle_menu_options"};
++    static const char *settingNames[]={"Chat messages","Show status","View cone","Player names","Back"};
++    static const char *settingCommands[]={"hud_saytext t","spec_drawstatus t","spec_drawcone t","spec_drawnames t","_spec_toggle_menu_options_settings"};
++    const char **n=rootNames,**c=rootCommands;int count=5;
++    if(m_menuFlags&MENU_SPEC_OPTIONS){n=cameraNames;c=cameraCommands;count=7;}
++    else if(m_menuFlags&MENU_OPTIONS_SETTINGS){n=settingNames;c=settingCommands;count=5;}
++    else if(m_menuFlags&MENU_OPTIONS){n=optionNames;c=optionCommands;count=6;}
++    for(int i=0;i<count;i++){names[i]=n[i];commands[i]=c[i];}return count;
++}
++int CHudSpectatorGui::NanoDraw()
++{
++    NanoHudScope scope(1.0f,0,0);
++    int h=NanoHudTextHeight(),r=255,g=140,b=0;
++    FillRGBABlend(0,0,ScreenWidth,2*h+12,0,0,0,153);
++    char summary[128],map[128];
++    snprintf(summary,sizeof(summary),"CT: %d   T: %d",label.m_iCounterTerrorists,label.m_iTerrorists);
++    DrawUtils::DrawHudString(4,h+8,ScreenWidth-4,summary,r,g,b);
++    const char *timer=m_bBombPlanted?"Bomb":label.m_szTimer;
++    DrawUtils::DrawHudString((ScreenWidth-NanoSpectatorWidth(timer))/2,4,ScreenWidth-4,timer,r,g,b);
++    NanoHudFit(label.m_szMap,map,sizeof(map),ScreenWidth-8,NanoSpectatorWidth);
++    // Map remains available in the scoreboard; team scores occupy this row.
++    FillRGBABlend(0,ScreenHeight-2*h-12,ScreenWidth,2*h+12,0,0,0,153);
++    if(g_iUser2>0 && g_iUser2<=MAX_PLAYERS) {
++        hud_player_info_t player;GetPlayerInfo(g_iUser2,&player);
++        char name[128],health[32];NanoHudFit(player.name?player.name:"",name,sizeof(name),ScreenWidth-8,NanoSpectatorWidth);
++        int value=g_PlayerExtraInfo[g_iUser2].sb_health>255?g_PlayerExtraInfo[g_iUser2].sb_health:g_PlayerExtraInfo[g_iUser2].health;
++        snprintf(health,sizeof(health),"Health: %d",value);GetTeamColor(r,g,b,g_PlayerExtraInfo[g_iUser2].teamnumber);
++        DrawUtils::DrawHudString(4,ScreenHeight-2*h-8,ScreenWidth-4,name,r,g,b);
++        DrawUtils::DrawHudString(4,ScreenHeight-h-4,ScreenWidth-4,health,r,g,b);
++    }
++    if(m_menuFlags&ROOT_MENU) {
++        gEngfuncs.Cvar_SetValue("nano_text_menu",1);
++        const char *names[8],*commands[8];int count=NanoEntries(names,commands);
++        nanoCursor=bound(0,nanoCursor,count-1);int pitch=h+10,visible=(ScreenHeight-16)/pitch;
++        int first=max(0,nanoCursor-visible+1);first=min(first,max(0,count-visible));
++        FillRGBABlend(4,4,ScreenWidth-8,ScreenHeight-8,0,0,0,230);
++        for(int row=first,y=8;row<count && row<first+visible;row++,y+=pitch) {
++            if(row==nanoCursor)FillRGBABlend(8,y-2,ScreenWidth-16,pitch,90,60,0,180);
++            DrawUtils::DrawHudString(12,y,ScreenWidth-12,names[row],commands[row][0]?255:100,commands[row][0]?140:100,commands[row][0]?0:100);
++        }
++    }
++    return 1;
++}
++int CHudSpectatorGui::NanoKey(int down,int key)
++{
++    if(!NanoHudActive() || !(m_menuFlags&ROOT_MENU))return 0;
++    if(key!=K_UPARROW && key!=K_DOWNARROW && key!=K_LEFTARROW && key!=K_RIGHTARROW && key!=K_ENTER && key!=K_BACKSPACE)return 0;
++    if(!down)return 1;
++    const char *names[8],*commands[8];int count=NanoEntries(names,commands);
++    if(key==K_BACKSPACE) {
++        if(m_menuFlags&MENU_SPEC_OPTIONS)UserCmd_ToggleSpectatorMenuSpectateOptions();
++        else if(m_menuFlags&MENU_OPTIONS_SETTINGS)UserCmd_ToggleSpectatorMenuOptionsSettings();
++        else if(m_menuFlags&MENU_OPTIONS)UserCmd_ToggleSpectatorMenuOptions();
++        else UserCmd_ToggleSpectatorMenu();
++    } else if(key==K_ENTER) {
++        if(commands[nanoCursor][0])gEngfuncs.pfnClientCmd((char *)commands[nanoCursor]);
++    } else {
++        int step=key==K_UPARROW || key==K_LEFTARROW?-1:1;
++        do nanoCursor=(nanoCursor+step+count)%count;while(!commands[nanoCursor][0]);
++    }
++    return 1;
++}
+--- a/cl_dll/hud/scoreboard.cpp
++++ b/cl_dll/hud/scoreboard.cpp
+@@ -21,6 +21,9 @@
+ #include <stdio.h>
+ #include <ctype.h>
+ #include "hud.h"
++#include "keydefs.h"
++#include "nano-hud-layout.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+ #include "triangleapi.h"
+@@ -126,6 +129,7 @@
+ 
+ void CHudScoreboard :: InitHUDData( void )
+ {
++    gEngfuncs.Cvar_SetValue("nano_scoreboard",0);
+ 	memset( g_PlayerExtraInfo, 0, sizeof g_PlayerExtraInfo );
+ 	m_iLastKilledBy = 0;
+ 	m_fLastKillTime = 0;
+@@ -168,6 +172,7 @@
+ 
+ int CHudScoreboard :: Draw( float flTime )
+ {
++	if(NanoHudActive())gEngfuncs.Cvar_SetValue("nano_scoreboard",ShouldDrawScoreboard());
+ 	if( !ShouldDrawScoreboard( ))
+ 		return 1;
+ 
+@@ -184,6 +189,7 @@
+ 		m_bDrawStroke = true;
+ 	}
+ 
++	if(NanoHudActive())return NanoDraw();
+ 	return DrawScoreboard(flTime);
+ }
+ 
+@@ -731,12 +737,12 @@
+ void CHudScoreboard :: UserCmd_ShowScores( void )
+ {
+ 	m_bForceDraw = false;
+-	m_bShowscoresHeld = true;
++	m_bShowscoresHeld = true; if(NanoHudActive())gEngfuncs.Cvar_SetValue("nano_scoreboard",1);
+ }
+ 
+ void CHudScoreboard :: UserCmd_HideScores( void )
+ {
+-	m_bForceDraw = m_bShowscoresHeld = false;
++	m_bForceDraw = m_bShowscoresHeld = false; gEngfuncs.Cvar_SetValue("nano_scoreboard",0);
+ }
+ 
+ 
+@@ -761,5 +767,56 @@
+ 
+ void CHudScoreboard :: UserCmd_HideScoreboard2()
+ {
+-	m_bForceDraw = m_bShowscoresHeld = false; // and disable it
+-}
++	m_bForceDraw = m_bShowscoresHeld = false; gEngfuncs.Cvar_SetValue("nano_scoreboard",0); // and disable it
++}
++
++static int NanoScoreWidth(const char *text){return DrawUtils::HudStringLen(text);}
++int CHudScoreboard::NanoDraw()
++{
++    GetAllPlayersInfo();gEngfuncs.Cvar_SetValue("nano_scoreboard",1);int players[MAX_PLAYERS],count=0;
++    for(int i=1;i<=MAX_PLAYERS;i++)if(g_PlayerInfoList[i].name && g_PlayerInfoList[i].name[0])players[count++]=i;
++    for(int i=1;i<count;i++)for(int j=i;j>0;j--) {
++        int a=players[j-1],b=players[j];
++        if(g_PlayerExtraInfo[a].frags>g_PlayerExtraInfo[b].frags ||
++          (g_PlayerExtraInfo[a].frags==g_PlayerExtraInfo[b].frags && g_PlayerExtraInfo[a].deaths<=g_PlayerExtraInfo[b].deaths))break;
++        players[j-1]=b;players[j]=a;
++    }
++    int h=NanoHudTextHeight(),pitch=2*h+8,visible=(ScreenHeight-2*h-38)/pitch;
++    int pages=max(1,(count+visible-1)/visible);nanoPage=bound(0,nanoPage,pages-1);
++    FillRGBABlend(4,4,ScreenWidth-8,ScreenHeight-8,0,0,0,210);
++    char title[128];NanoHudFit(gHUD.m_szServerName[0]?gHUD.m_szServerName:"Scoreboard",title,sizeof(title),ScreenWidth-8,NanoScoreWidth);
++    DrawUtils::DrawHudString(8,8,ScreenWidth-8,title,255,140,0);
++    const char *level=gEngfuncs.pfnGetLevelName(),*base=strrchr(level,'/');if(base)level=base+1;
++    char map[128];NanoHudFit(level,map,sizeof(map),ScreenWidth-16,NanoScoreWidth);
++    DrawUtils::DrawHudString(8,h+12,ScreenWidth-8,map,190,190,190);
++    for(int row=nanoPage*visible,y=2*h+18;row<count && row<(nanoPage+1)*visible;row++,y+=pitch) {
++        int id=players[row],r=255,g=140,b=0;char name[128],score[40],detail[128],entry[192];
++        GetTeamColor(r,g,b,g_PlayerExtraInfo[id].teamnumber);
++        snprintf(score,sizeof(score),"%d/%d",g_PlayerExtraInfo[id].frags,g_PlayerExtraInfo[id].deaths);
++        int nameWidth=ScreenWidth-24-DrawUtils::HudStringLen(score);
++        snprintf(entry,sizeof(entry),"%s %s",g_PlayerExtraInfo[id].teamnumber==TEAM_CT?"CT":g_PlayerExtraInfo[id].teamnumber==TEAM_TERRORIST?"T":"S",g_PlayerInfoList[id].name);
++        NanoHudFit(entry,name,sizeof(name),nameWidth,NanoScoreWidth);
++        if(id==m_iPlayerNum)FillRGBABlend(6,y-2,ScreenWidth-12,pitch,60,60,30,120);
++        DrawUtils::DrawHudString(8,y,ScreenWidth-8,name,r,g,b);
++        DrawUtils::DrawHudStringReverse(ScreenWidth-8,y,8,score,r,g,b);
++        char health[20],money[24];
++        if(g_PlayerExtraInfo[id].dead)strcpy(health,"dead");
++        else if(g_PlayerExtraInfo[id].sb_health>=0)snprintf(health,sizeof(health),"HP %d",g_PlayerExtraInfo[id].sb_health);
++        else strcpy(health,"HP -");
++        if(g_PlayerExtraInfo[id].sb_account>=0)snprintf(money,sizeof(money),"$%d",g_PlayerExtraInfo[id].sb_account);else strcpy(money,"$-");
++        snprintf(entry,sizeof(entry),"%s %s %s p%d",health,money,g_PlayerExtraInfo[id].has_c4?"C4":g_PlayerExtraInfo[id].vip?"VIP":g_PlayerExtraInfo[id].has_defuse_kit?"kit":"",g_PlayerInfoList[id].ping);
++        NanoHudFit(entry,detail,sizeof(detail),ScreenWidth-16,NanoScoreWidth);
++        DrawUtils::DrawHudString(8,y+h+2,ScreenWidth-8,detail,190,190,190);
++    }
++    snprintf(title,sizeof(title),"%d/%d",nanoPage+1,pages);
++    DrawUtils::DrawHudStringReverse(ScreenWidth-8,ScreenHeight-h-6,8,title,255,140,0);
++    return 1;
++}
++int CHudScoreboard::NanoKey(int down,int key)
++{
++    if(!NanoHudActive() || !ShouldDrawScoreboard())return 0;
++    if(key==K_BACKSPACE && m_bForceDraw){if(down){m_bForceDraw=false;gEngfuncs.Cvar_SetValue("nano_scoreboard",0);}return 1;}
++    if(key!=K_LEFTARROW && key!=K_RIGHTARROW && key!=K_UPARROW && key!=K_DOWNARROW)return 0;
++    if(down)nanoPage+=key==K_LEFTARROW || key==K_UPARROW?-1:1;
++    if(nanoPage<0)nanoPage=0;return 1;
++}
+--- a/cl_dll/draw_util.cpp
++++ b/cl_dll/draw_util.cpp
+@@ -402,7 +402,7 @@
+ 	for ( l = 0; *szIt != 0 && *szIt != '\n'; szIt++ )
+ 	{
+ 		if( szIt[0] == '\\' && szIt[1] != '\n' &&
+-			(szIt[1] == 'y' || szIt[1] == 'w' || szIt[1] == 'd' || szIt[1] == 'R') ) // not sure is reversing handled correctly
++			(szIt[1] == 'y' || szIt[1] == 'r' || szIt[1] == 'w' || szIt[1] == 'd' || szIt[1] == 'R') ) // not sure is reversing handled correctly
+ 		{
+ 			szIt++;
+ 			continue;
+--- a/cl_dll/hud.cpp
++++ b/cl_dll/hud.cpp
+@@ -281,6 +281,9 @@
+ // This is called every time the DLL is loaded
+ void CHud :: Init( void )
+ {
++    gEngfuncs.pfnRegisterVariable("nano_scoreboard","0",0);
++    gEngfuncs.pfnRegisterVariable("nano_observing","0",0);
++    gEngfuncs.pfnRegisterVariable("nano_hud_objective_until","0",0);
+ 	SetGameType(); // call it first, so we will know gamedir at very early stage
+ 
+ 	HOOK_COMMAND_FUNC( "special", __CmdFunc_InputCommandSpecial, );
+--- a/cl_dll/input.cpp
++++ b/cl_dll/input.cpp
+@@ -369,6 +369,7 @@
+ */
+ int DLLEXPORT HUD_Key_Event( int down, int keynum, const char *pszCurrentBinding )
+ {
++    if(gHUD.m_Scoreboard.NanoKey(down,keynum) || gHUD.m_SpectatorGui.NanoKey(down,keynum))return 0;
+     if(gEngfuncs.pfnGetCvarFloat("nano_control_scheme")==1 && gHUD.m_Menu.m_fMenuDisplayed &&
+        gHUD.m_Menu.NanoKey(down,keynum))return 0;
+ 	if( g_pMenu )

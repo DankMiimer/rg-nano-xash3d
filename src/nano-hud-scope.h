@@ -16,12 +16,21 @@
 // THE SOFTWARE.
 #ifndef NANO_HUD_SCOPE_H
 #define NANO_HUD_SCOPE_H
+#include <string.h>
 class NanoHudScope {
     float oldScale, oldX, oldY, oldDX, oldDY;
     float scale, anchorX, anchorY;
     bool enabled;
 public:
     NanoHudScope(const char *setting, float x, float y) {
+        float value=gEngfuncs.pfnGetCvarFloat(setting);
+        // Retain the physical footprint of radar and sprite crosshairs.
+        if (!strcmp(setting,"nano_hud_radar") || !strcmp(setting,"nano_hud_crosshair")) value*=0.65f;
+        Init(value,x,y);
+    }
+    NanoHudScope(float value,float x,float y) { Init(value,x,y); }
+    float Scale() const { return enabled ? scale : 1.0f; }
+    void Init(float value,float x,float y) {
         enabled = gEngfuncs.pfnGetCvarPointer("nano_hud_element_scale") &&
             gEngfuncs.pfnGetCvarFloat("nano_hud_profile") != 0;
         if (!enabled) return;
@@ -30,7 +39,7 @@ public:
         oldY = gEngfuncs.pfnGetCvarFloat("nano_hud_anchor_y");
         oldDX = gEngfuncs.pfnGetCvarFloat("nano_hud_offset_x");
         oldDY = gEngfuncs.pfnGetCvarFloat("nano_hud_offset_y");
-        scale = gEngfuncs.pfnGetCvarFloat(setting);
+        scale = value;
         anchorX = x; anchorY = y;
         if (!(scale >= 0.25f && scale <= 4.0f)) scale = 1.0f;
         gEngfuncs.Cvar_SetValue("nano_hud_element_scale", scale);

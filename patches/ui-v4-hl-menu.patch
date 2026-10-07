@@ -1,0 +1,11 @@
+--- a/menus/Main.cpp
++++ b/menus/Main.cpp
+@@ -400,6 +400,8 @@
+     const bool nano = ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile");
+     console.SetVisibility(gpGlobals->developer != 0 && !nano);
+     nanoLayout = nano;
++    // Omit unused entries from Nano drawing and keyboard navigation.
++    customGame.SetVisibility(!nano);previews.SetVisibility(!nano);
+     banner.SetVisibility(!nano);
+     movieBanner.SetVisibility(!nano);
+     animatedBanner.SetVisibility(!nano);

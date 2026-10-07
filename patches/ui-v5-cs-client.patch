@@ -1,0 +1,52 @@
+--- a/cl_dll/hud/timer.cpp
++++ b/cl_dll/hud/timer.cpp
+@@ -154,9 +154,11 @@
+ 	return 1;
+ }
+ 
++static HSPRITE nanoMenuBackground;
+ int CHudProgressBar::VidInit()
+ {
+-	return 1;
++    nanoMenuBackground=NanoHudActive()?SPR_Load("sprites/nano_menu_background.spr"):0;
++    return 1;
+ }
+ 
+ void CHudProgressBar::Reset( void )
+@@ -253,21 +255,29 @@
+ int CHudProgressBar::NanoDrawLoading(float time)
+ {
+     // An opaque, persistent screen keeps transient stage updates from exposing laggy gameplay.
+-    FillRGBABlend(0,0,ScreenWidth,ScreenHeight,20,20,20,255);
++    NanoHudScope menuScale(1,0,0);
++    FillRGBABlend(0,0,ScreenWidth,ScreenHeight,76,88,68,255);
++    if(nanoMenuBackground){SPR_Set(nanoMenuBackground,255,255,255);SPR_Draw(0,0,0,NULL);}
++    FillRGBABlend(8,44,ScreenWidth-16,152,76,88,68,255);
++    FillRGBA(8,44,ScreenWidth-16,1,136,145,128,255);FillRGBA(8,44,1,152,136,145,128,255);
++    FillRGBA(8,195,ScreenWidth-16,1,40,46,34,255);FillRGBA(ScreenWidth-9,44,1,152,40,46,34,255);
+     char heading[]="Preparing bots",stage[96],detail[96];
+     const char *names[]={"","Exploring the map","Finding hiding spots","Planning routes"};
+     snprintf(stage,sizeof(stage),"%d/3  %s",nanoLoading.stage,names[nanoLoading.stage]);
+-    DrawUtils::DrawHudString(12,68,ScreenWidth-12,heading,255,140,0);
+-    DrawUtils::DrawHudString(12,104,ScreenWidth-12,stage,220,220,220);
+-    int width=ScreenWidth-24,x=12,y=144;DrawUtils::DrawRectangle(x,y,width,12);
++    DrawUtils::DrawHudString(12,68,ScreenWidth-12,heading,196,181,80);
++    DrawUtils::DrawHudString(12,104,ScreenWidth-12,stage,216,222,211);
++    int width=ScreenWidth-32,x=16,y=144;
++    FillRGBA(x,y,width,12,62,70,55,255);
++    FillRGBA(x,y,width,1,40,46,34,255);FillRGBA(x,y,1,12,40,46,34,255);
++    FillRGBA(x,y+11,width,1,136,145,128,255);FillRGBA(x+width-1,y,1,12,136,145,128,255);
+     if(nanoLoading.stage==1) {
+         int span=max(8,(width-4)/9),offset=(int)(time*24)%max(1,(width-4)/3-span);
+-        FillRGBA(x+2+offset,y+2,span,8,255,140,0,255);
++        FillRGBA(x+2+offset,y+2,span,8,196,181,80,255);
+         strcpy(detail,"Exploration in progress");
+     } else {
+-        FillRGBA(x+2,y+2,(int)((width-4)*nanoLoading.progress),8,255,140,0,255);
++        FillRGBA(x+2,y+2,(int)((width-4)*nanoLoading.progress),8,196,181,80,255);
+         snprintf(detail,sizeof(detail),"%d%% overall",(int)(nanoLoading.progress*100));
+     }
+-    DrawUtils::DrawHudString(12,174,ScreenWidth-12,detail,190,190,190);
++    DrawUtils::DrawHudString(12,174,ScreenWidth-12,detail,160,170,149);
+     return 1;
+ }

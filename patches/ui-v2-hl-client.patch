@@ -1,0 +1,90 @@
+--- a/cl_dll/ammo.cpp
++++ b/cl_dll/ammo.cpp
+@@ -19,6 +19,8 @@
+ //
+ 
+ #include "hud.h"
++#include "nano-hud-layout.h"
++#include "nano-hud-scope.h"
+ #include "nano-hud-scope.h"
+ #include "cl_util.h"
+ #include "parsemsg.h"
+@@ -892,6 +894,43 @@
+ 
+ 	ScaleColors( r, g, b, a );
+ 
++
++    if(NanoHudActive()) {
++        float scale=gEngfuncs.pfnGetCvarFloat("nano_hud_bottom");
++        int digitHeight=gHUD.m_iFontHeight;
++        wrect_t cross=gHUD.GetSpriteRect(gHUD.GetSpriteIndex("cross"));
++        float healthWidth=((cross.right-cross.left)/2.0f+4.1f*AmmoWidth)*scale;
++        int iconWidth=pw->rcAmmo.right-pw->rcAmmo.left;
++        int fullWidth=(pw->iClip>=0?6:3)*AmmoWidth+(pw->iClip>=0?4:1)+iconWidth;
++        bool split=pw->iClip>=0 && fullWidth*scale>ScreenWidth-12-healthWidth;
++        int modes[3],rows=0;
++        if(pw->iAmmoType>0){modes[rows++]=split?2:0;if(split)modes[rows++]=1;}
++        if(pw->iAmmo2Type>0 && gWR.CountAmmo(pw->iAmmo2Type)>0)modes[rows++]=3;
++        int inset=4;
++        for(int row=0;row<rows;row++) {
++            int mode=modes[row];bool secondary=mode==3,clipOnly=mode==2;
++            wrect_t rect=secondary?pw->rcAmmo2:pw->rcAmmo;
++            int iw=clipOnly?0:rect.right-rect.left,ih=clipOnly?digitHeight:rect.bottom-rect.top;
++            int height=ih>digitHeight?ih:digitHeight;
++            bool full=mode==0 && pw->iClip>=0;
++            int width=(full?6:3)*AmmoWidth+(full?4:1)+iw;
++            if(width*scale>ScreenWidth-12-healthWidth)inset=Q_max(inset,(int)ceilf(2*digitHeight*scale)+12);
++            NanoHudScope rowScope("nano_hud_bottom",0,0);
++            rowScope.Place(0,0,width,height,1,1,4,inset);
++            int px=0,py=(height-digitHeight)/2;
++            if(full || clipOnly) {
++                px=gHUD.DrawHudNumber(px,py,iFlags|DHN_3DIGITS,pw->iClip,r,g,b);
++                if(full){FillRGBA(px+1,py,1,digitHeight,r,g,b,a);px+=3;}
++            }
++            if(!clipOnly) {
++                px=gHUD.DrawHudNumber(px,py,iFlags|DHN_3DIGITS,gWR.CountAmmo(secondary?pw->iAmmo2Type:pw->iAmmoType),r,g,b);
++                SPR_Set(secondary?pw->hAmmo2:pw->hAmmo,r,g,b);
++                SPR_DrawAdditive(0,px+1,(height-ih)/2,&rect);
++            }
++            inset+=(int)ceilf(height*scale)+4;
++        }
++        return 1;
++    }
+ 	// Does this weapon have a clip?
+ 	y = ScreenHeight - gHUD.m_iFontHeight - gHUD.m_iFontHeight / 2;
+ 	nanoScope.Place(ScreenWidth-8*AmmoWidth-(m_pWeapon->rcAmmo.right-m_pWeapon->rcAmmo.left), y-(m_pWeapon->rcAmmo.bottom-m_pWeapon->rcAmmo.top)/8, ScreenWidth, y+gHUD.m_iHudNumbersYOffset+Q_max(gHUD.m_iFontHeight,(m_pWeapon->rcAmmo.bottom-m_pWeapon->rcAmmo.top)-(m_pWeapon->rcAmmo.bottom-m_pWeapon->rcAmmo.top)/8), 1, 1);
+--- a/cl_dll/battery.cpp
++++ b/cl_dll/battery.cpp
+@@ -121,9 +121,9 @@
+ 	int dw = gHUD.GetSpriteRect(gHUD.m_HUD_number_0).right-gHUD.GetSpriteRect(gHUD.m_HUD_number_0).left;
+ 	wrect_t health = gHUD.GetSpriteRect(gHUD.GetSpriteIndex("cross"));
+ 	float size = gEngfuncs.pfnGetCvarFloat("nano_hud_bottom");
+-	nanoScope.Place(x, y-iOffset, x+(m_prc1->right-m_prc1->left)+3*dw,
+-		y+Q_max(gHUD.m_iFontHeight+gHUD.m_iHudNumbersYOffset,m_prc1->bottom-m_prc1->top-iOffset), 0, 1,
+-		6+((health.right-health.left)/2.0f+4.1f*dw)*size, 2);
++	nanoScope.Place(x,y-iOffset,x+(m_prc1->right-m_prc1->left)+3*dw,
++            y+Q_max(gHUD.m_iFontHeight+gHUD.m_iHudNumbersYOffset,m_prc1->bottom-m_prc1->top-iOffset),0,1,
++            4,8+ceilf(gHUD.m_iFontHeight*size));
+ 
+ 	// make sure we have the right sprite handles
+ 	if( !m_hSprite1 )
+--- a/cl_dll/hud_redraw.cpp
++++ b/cl_dll/hud_redraw.cpp
+@@ -18,6 +18,8 @@
+ #include <cmath>
+ 
+ #include "hud.h"
++#include "nano-hud-layout.h"
++#include "nano-hud-scope.h"
+ #include "cl_util.h"
+ //#include "triangleapi.h"
+ 
+@@ -99,6 +101,8 @@
+ // returns 1 if they've changed, 0 otherwise
+ int CHud::Redraw( float flTime, int intermission )
+ {
++    if(NanoHudActive() && m_scrinfo.iCharHeight!=NanoHudTextHeight())gEngfuncs.pfnGetScreenInfo(&m_scrinfo);
++
+ 	m_fOldTime = m_flTime;	// save time of previous redraw
+ 	m_flTime = flTime;
+ 	m_flTimeDelta = (double)( m_flTime - m_fOldTime );

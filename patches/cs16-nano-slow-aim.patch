@@ -1,0 +1,53 @@
+diff --git a/cl_dll/input.cpp b/cl_dll/input.cpp
+index 22eeb3d..32586ff 100644
+--- a/cl_dll/input.cpp
++++ b/cl_dll/input.cpp
+@@ -595,7 +595,7 @@ Moves the local angle positions
+ ================
+ */
+ static cvar_t *nano_look_accel, *nano_look_delay, *nano_look_ramp;
+-static cvar_t *nano_look_max_yaw, *nano_look_fast;
++static cvar_t *nano_look_max_yaw, *nano_look_fast, *nano_look_slow;
+ static NanoLookState nanoYaw = { 0, 0.0f };
+ 
+ // The Xash input backend does not provide SDL's force_centerview command.
+@@ -627,6 +627,11 @@ void CL_AdjustAngles ( float frametime, float *viewangles )
+ 			nano_look_delay->value, nano_look_ramp->value,
+ 			cl_yawspeed->value, nano_look_max_yaw->value, nano_look_fast->value != 0);
+ 	} else { nanoYaw.direction = 0; nanoYaw.held = 0.0f; }
++	float pitchRate=cl_pitchspeed->value;
++	if(nano_look_slow && nano_look_slow->value) {
++		nanoYaw.direction=0;nanoYaw.held=0.0f;
++		yawRate=cl_yawspeed->value*0.25f;pitchRate*=0.25f;
++	}
+ 
+ 	if (in_speed.state & 1)
+ 	{
+@@ -646,15 +651,15 @@ void CL_AdjustAngles ( float frametime, float *viewangles )
+ 	if (in_klook.state & 1)
+ 	{
+ 		//V_StopPitchDrift ();
+-		viewangles[PITCH] -= speed*cl_pitchspeed->value * CL_KeyState (&in_forward);
+-		viewangles[PITCH] += speed*cl_pitchspeed->value * CL_KeyState (&in_back);
++		viewangles[PITCH] -= speed*pitchRate * CL_KeyState (&in_forward);
++		viewangles[PITCH] += speed*pitchRate * CL_KeyState (&in_back);
+ 	}
+ 	
+ 	up = CL_KeyState (&in_lookup);
+ 	down = CL_KeyState(&in_lookdown);
+ 	
+-	viewangles[PITCH] -= speed*cl_pitchspeed->value * up;
+-	viewangles[PITCH] += speed*cl_pitchspeed->value * down;
++	viewangles[PITCH] -= speed*pitchRate * up;
++	viewangles[PITCH] += speed*pitchRate * down;
+ #if 0
+ 	if (up || down)
+ 		V_StopPitchDrift ();
+@@ -1009,6 +1014,7 @@ void InitInput (void)
+ 	nano_look_ramp = gEngfuncs.pfnRegisterVariable("nano_look_ramp", "0.75", FCVAR_ARCHIVE);
+ 	nano_look_max_yaw = gEngfuncs.pfnRegisterVariable("nano_look_max_yaw", "210", FCVAR_ARCHIVE);
+ 	nano_look_fast = gEngfuncs.pfnRegisterVariable("nano_look_fast", "0", 0);
++	nano_look_slow = gEngfuncs.pfnRegisterVariable("nano_look_slow", "0", 0);
+ 	gEngfuncs.pfnAddCommand("nano_centerview", NanoCenterView);
+ 	cl_yawspeed			= gEngfuncs.pfnRegisterVariable ( "cl_yawspeed", "210", 0 );
+ 	cl_pitchspeed		= gEngfuncs.pfnRegisterVariable ( "cl_pitchspeed", "225", 0 );

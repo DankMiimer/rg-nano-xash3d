@@ -1,0 +1,29 @@
+--- a/regamedll/dlls/bot/cs_bot_learn.cpp
++++ b/regamedll/dlls/bot/cs_bot_learn.cpp
+@@ -181,6 +181,7 @@
+ 	if (!GetGroundHeight(&pos, &pos.z, &normal))
+ 	{
+ 		CONSOLE_ECHO("ERROR: Start position invalid\n\n");
++        hideProgressMeter();
+ 		m_processMode = PROCESS_NORMAL;
+ 		return;
+ 	}
+--- a/regamedll/dlls/bot/cs_bot_chatter.cpp
++++ b/regamedll/dlls/bot/cs_bot_chatter.cpp
+@@ -1138,6 +1138,16 @@
+ 				// CONSOLE_ECHO("%s: Radio('%s')\n", STRING(me->pev->netname), filename);
+ 
+ 				bool sayIt = true;
++                if(filename && strstr(filename,"im_going_to_camp.wav")) {
++                    static float lastCamp[4]={-100,-100,-100,-100};
++                    int team=(int)me->m_iTeam;float now=gpGlobals->time;
++                    if(team>=0 && team<4) {
++                        if(now<lastCamp[team])lastCamp[team]=-100;
++                        if(now-lastCamp[team]<20.0f)sayIt=false;
++                        else lastCamp[team]=now;
++                    }
++                }
++
+ 				if (phrase->IsPlace())
+ 				{
+ 					// don't repeat the place if someone just mentioned it not too long ago

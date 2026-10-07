@@ -1,0 +1,170 @@
+--- a/engine/client/avi/avi_ffmpeg.c
++++ b/engine/client/avi/avi_ffmpeg.c
+@@ -809,6 +809,9 @@
+ 	return true;
+ }
+ #else
++#if XASH_VIDEO == VIDEO_FBDEV
++#include "nano-intro-player.h"
++#else
+ struct movie_state_s
+ {
+ 	qboolean active;
+@@ -853,6 +856,8 @@
+ {
+ 	return false;
+ }
++
++#endif
+ 
+ static qboolean AVI_ValidateFFmpegVersion( void )
+ {
+@@ -885,8 +890,16 @@
+ {
+ 	if( XASH_AVI == AVI_NULL )
+ 	{
++#if XASH_VIDEO == VIDEO_FBDEV
++        if( Sys_CheckParm( "-noavi" ))return false;
++        avi_initialized = true;
++        avi_mempool = Mem_AllocPool( "Nano Intro Zone" );
++        Con_Printf( "AVI: prepared Nano intro playback\n" );
++        return true;
++#else
+ 		Con_Printf( "AVI: Not supported\n" );
+ 		return false;
++#endif
+ 	}
+ 
+ 	if( Sys_CheckParm( "-noavi" ))
+--- a/engine/client/cl_video.c
++++ b/engine/client/cl_video.c
+@@ -27,6 +27,12 @@
+ static movie_state_t	*cin_state;
+ static int		cin_texture;
+ 
++static qboolean nano_intro_active;
++static int nano_intro_nextstate;
++qboolean SCR_NanoIntroActive( void ) { return nano_intro_active; }
++void SCR_NanoIntroSkip( void ) { if( nano_intro_active )SCR_NextMovie(); }
++
++
+ /*
+ ==================
+ SCR_NextMovie
+@@ -38,6 +44,13 @@
+ qboolean SCR_NextMovie( void )
+ {
+ 	string	str;
++
++    if( nano_intro_active )
++    {
++        S_StopAllSounds( true );
++        SCR_StopCinematic();
++        return false;
++    }
+ 
+ 	if( cls.movienum == -1 )
+ 	{
+@@ -98,6 +111,25 @@
+ 	}
+ #endif
+ 
++#if XASH_VIDEO == VIDEO_FBDEV && XASH_AVI == AVI_NULL
++    // The command line may already have queued a map or opened the match menu.
++    // Keep that destination, but show the owner's bounded Valve intro first.
++    if( !Sys_CheckParm( "-nointro" ) && !Sys_CheckParm( "-noavi" ) && cls.demonum == -1 &&
++        ( GameState->nextstate == STATE_RUNFRAME || GameState->nextstate == STATE_LOAD_LEVEL ||
++          GameState->nextstate == STATE_LOAD_GAME ) && FS_FileExists( "media/nano_valve.nvi", false ))
++    {
++        nano_intro_nextstate = GameState->nextstate;
++        GameState->nextstate = STATE_RUNFRAME;
++        if( SCR_PlayCinematic( "media/nano_valve.nvi" ))
++        {
++            nano_intro_active = true;
++            cls.movienum = -1;
++            return;
++        }
++        GameState->nextstate = nano_intro_nextstate;
++    }
++#endif
++
+ 	if( Sys_CheckParm( "-nointro" ) || cls.demonum != -1 || GameState->nextstate != STATE_RUNFRAME )
+ 	{
+ 		// don't run movies where we in developer-mode
+@@ -151,6 +183,8 @@
+ 
+ 	if( UI_IsVisible( ))
+ 	{
++        if( nano_intro_active ) { SCR_NextMovie();return; }
++
+ 		// these can happens when user set +menu_ option to cmdline
+ 		AVI_CloseVideo( cin_state );
+ 		cls.state = ca_disconnected;
+@@ -268,6 +302,13 @@
+ 	cls.state = ca_disconnected;
+ 	cls.signon = 0;
+ 
++    if( nano_intro_active )
++    {
++        nano_intro_active = false;
++        if( GameState->nextstate == STATE_RUNFRAME )GameState->nextstate = nano_intro_nextstate;
++        if( GameState->nextstate != STATE_RUNFRAME )return;
++        if( Sys_CheckParm( "+menu_nano_match" ))Cbuf_AddText( "menu_nano_match\n" );
++    }
+ 	UI_SetActiveMenu( true );
+ }
+ 
+--- a/engine/platform/linux/in_evdev.c
++++ b/engine/platform/linux/in_evdev.c
+@@ -44,11 +44,15 @@
+ static CVAR_DEFINE_AUTO( nano_scoreboard, "0", 0, "Nano scoreboard input context" );
+ static CVAR_DEFINE_AUTO( nano_text_menu, "0", 0, "CS text menu input context" );
+ static NanoControlState nanoControls = { 0, 0, 0, -1, 0 };
++qboolean SCR_NanoIntroActive( void );
++void SCR_NanoIntroSkip( void );
++static byte nanoIntroHeld[KEY_MAX+1];
++
+ static int NanoControlContext(void)
+ {
+     if(cls.key_dest == key_game && cls.state == ca_active)
+         return (nano_text_menu.value || nano_scoreboard.value) ? 2 : 1;
+-    return 0;
++    return cls.key_dest==key_menu?0:3;
+ }
+ static void NanoControlKey(int action,int down,void *opaque)
+ {
+@@ -60,6 +64,8 @@
+     case NC_UIDOWN:key=K_DOWNARROW;break;
+     case NC_UILEFT:key=K_LEFTARROW;break;
+     case NC_UIRIGHT:key=K_RIGHTARROW;break;
++    case NC_UISAVE:key=K_F8;break;
++    case NC_UIDELETE:key=K_F9;break;
+     case NC_CONFIRM:key=K_ENTER;break;
+     case NC_CANCEL:key=nanoControls.context==2?K_BACKSPACE:K_ESCAPE;break;
+     }
+@@ -374,9 +380,23 @@
+ 
+ 		while ( read( evdev.fds[i], &ev, sizeof( ev )) == sizeof( ev ) )
+ 		{
+-            if(nano_control_scheme.value==1 && ev.type==EV_SYN && ev.code==SYN_DROPPED) {
+-                NanoControlRelease(&nanoControls,NanoControlKey,NULL);
++            if(ev.type==EV_SYN && ev.code==SYN_DROPPED) {
++                memset(nanoIntroHeld,0,sizeof(nanoIntroHeld));
++                if(nano_control_scheme.value==1)NanoControlRelease(&nanoControls,NanoControlKey,NULL);
+                 continue;
++            }
++            // A skipping button and its repeats/releases belong to the intro.
++            // Consume them before either the face preset or classic bindings.
++            if(ev.type==EV_KEY && ev.code<=KEY_MAX) {
++                if(SCR_NanoIntroActive()) {
++                    nanoIntroHeld[ev.code]=ev.value!=0;
++                    if(ev.value==1)SCR_NanoIntroSkip();
++                    continue;
++                }
++                if(nanoIntroHeld[ev.code]) {
++                    if(!ev.value)nanoIntroHeld[ev.code]=0;
++                    continue;
++                }
+             }
+             if(nano_control_scheme.value==1 && ev.type==EV_KEY && ev.code>=59 && ev.code<59+NC_BUTTONS) {
+                 NanoControlEvent(&nanoControls,ev.code-59,ev.value,NanoControlContext(),NanoControlKey,NULL);

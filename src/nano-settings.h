@@ -29,7 +29,14 @@ typedef struct {
 
 static inline NanoSettings NanoSettingsDefaults(void)
 {
-    NanoSettings s={1,1,1,30,0.15f,0.75f,70,75,3,1.125f,1.125f,0.5f,2,1.25f};
+    NanoSettings s={1,1,1,30,0.15f,0.75f,70,75,3,2.0f,2.0f,0.5f,1.5f,14};
+    return s;
+}
+
+static inline NanoSettings NanoSettingsDefaultsForGame(int cs)
+{
+    NanoSettings s=NanoSettingsDefaults();
+    if(cs) {s.bottom=s.side=0.8f;s.crosshair=2;}
     return s;
 }
 
@@ -50,12 +57,12 @@ static inline NanoSettings NanoSettingsSanitize(NanoSettings s)
     s.yaw=NanoSettingsStep(s.yaw,30,120,5,70);
     s.pitch=NanoSettingsStep(s.pitch,30,150,5,75);
     s.fastMultiplier=NanoSettingsStep(s.fastMultiplier,1,4,0.25f,3);
-    // Keep full health/armor and ammo inside the square-screen bottom row.
-    s.bottom=NanoSettingsStep(s.bottom,0.75f,1.125f,0.025f,1.125f);
-    s.side=NanoSettingsStep(s.side,0.75f,1.5f,0.025f,1.125f);
+    // Native canvas: layout stacks groups when a selected size needs more room.
+    s.bottom=NanoSettingsStep(s.bottom,0.6f,2.0f,0.025f,1.5f);
+    s.side=NanoSettingsStep(s.side,0.6f,2.0f,0.025f,1.5f);
     s.radar=NanoSettingsStep(s.radar,0.25f,0.75f,0.05f,0.5f);
     s.crosshair=NanoSettingsStep(s.crosshair,1,3,0.25f,2);
-    s.menu=NanoSettingsStep(s.menu,1,1.25f,0.05f,1.25f);
+    s.menu=NanoSettingsStep(s.menu,12,18,2,14);
     return s;
 }
 
@@ -84,7 +91,7 @@ static inline int NanoSettingsSerialize(char *buffer,size_t size,NanoSettings se
         "set nano_aim_yaw \"%.0f\"\nset nano_aim_pitch \"%.0f\"\nset nano_aim_fast_multiplier \"%.2f\"\n"
         "cl_yawspeed \"%.0f\"\ncl_pitchspeed \"%.0f\"\nnano_look_max_yaw \"%.2f\"\nnano_look_fast \"0\"\n"
         "set nano_hud_bottom \"%.3f\"\nset nano_hud_side \"%.3f\"\nset nano_hud_radar \"%.2f\"\n"
-        "set nano_hud_crosshair \"%.2f\"\nset nano_hud_menu \"%.2f\"\n%s",
+        "set nano_hud_crosshair \"%.2f\"\nset nano_hud_menu \"1\"\nset nano_hud_text_height \"%.0f\"\nset nano_ui_profile_version \"3\"\n%s",
         s.limitFPS,s.fps,s.limitFPS?s.fps:0,s.frameSleep,s.lookAccel,s.delay,s.ramp,
         s.yaw,s.pitch,s.fastMultiplier,s.yaw,s.pitch,s.yaw*s.fastMultiplier,
         s.bottom,s.side,s.radar,s.crosshair,s.menu,aim);

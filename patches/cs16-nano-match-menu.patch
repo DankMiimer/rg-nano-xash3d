@@ -1,0 +1,36 @@
+--- a/menus/Configuration.cpp
++++ b/menus/Configuration.cpp
+@@ -25,6 +25,7 @@
+ #include "keydefs.h"
+ #include "TabView.h"
+ #include "nano-menu-options.h"
++#include "nano-menu-match.h"
+ 
+ #define ART_BANNER	     	"gfx/shell/head_config"
+ 
+--- a/menus/Main.cpp
++++ b/menus/Main.cpp
+@@ -30,6 +30,7 @@
+ #include "gameinfo.h"
+ #include "AnimatedBanner.h"
+ #include "MovieBanner.h"
++void UI_NanoMatch_Menu();
+ 
+ #define ART_MINIMIZE_N	"gfx/shell/min_n"
+ #define ART_MINIMIZE_F	"gfx/shell/min_f"
+@@ -412,6 +413,15 @@
+     const bool nano = ScreenWidth <= 320 && EngFuncs::GetCvarFloat("nano_hud_profile");
+     console.SetVisibility(gpGlobals->developer != 0 && !nano);
+     nanoLayout = nano;
++    if (nano && !stricmp(gMenu.m_gameinfo.gamefolder,"cstrike")) {
++        multiPlayer.SetNameAndStatus("Offline match", "Choose map, bots and difficulty");
++        multiPlayer.onReleased = UI_NanoMatch_Menu;
++        saveRestore.SetVisibility(false);
++        hazardCourse.SetVisibility(false);
++    } else {
++        multiPlayer.SetNameAndStatus(L("GameUI_Multiplayer"), L("StringsList_198"));
++        multiPlayer.onReleased = UI_MultiPlayer_Menu;
++    }
+     banner.SetVisibility(!nano);
+     movieBanner.SetVisibility(!nano);
+     animatedBanner.SetVisibility(!nano);

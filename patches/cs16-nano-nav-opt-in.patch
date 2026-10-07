@@ -1,0 +1,46 @@
+--- a/regamedll/dlls/bot/cs_bot_init.cpp
++++ b/regamedll/dlls/bot/cs_bot_init.cpp
+@@ -27,6 +27,8 @@
+ */
+ 
+ #include "precompiled.h"
++
++cvar_t cv_nano_nav_analyze = { "nano_nav_analyze", "1", FCVAR_SERVER, 0.0f, nullptr };
+ 
+ cvar_t cv_bot_enable                 = { "bot_enable", "0", 0, 0.0f, nullptr };
+ cvar_t cv_bot_traceview              = { "bot_traceview", "0", FCVAR_SERVER, 0.0f, nullptr };
+@@ -104,6 +106,7 @@
+ 	CVAR_REGISTER(&cv_bot_nav_zdraw);
+ 	CVAR_REGISTER(&cv_bot_walk);
+ 	CVAR_REGISTER(&cv_bot_difficulty);
++	CVAR_REGISTER(&cv_nano_nav_analyze);
+ 	CVAR_REGISTER(&cv_bot_debug);
+ 	CVAR_REGISTER(&cv_bot_quicksave);
+ 	CVAR_REGISTER(&cv_bot_quota);
+@@ -347,6 +350,12 @@
+ 
+ 	if (TheNavAreaList.empty() && !TheCSBots()->IsLearningMap())
+ 	{
++        // A stale/corrupt NAV must not silently start expensive Nano analysis.
++        if (CVAR_GET_FLOAT("sv_lan") && !cv_nano_nav_analyze.value) {
++            CONSOLE_ECHO("Nano: no usable NAV; disabling bots. Enable NAV analysis in Advanced.\n");
++            CVAR_SET_FLOAT("bot_quota", 0);
++            return;
++        }
+ 		TheCSBots()->SetLearningMapFlag();
+ 		StartLearnProcess();
+ 	}
+--- a/regamedll/dlls/bot/cs_bot_manager.cpp
++++ b/regamedll/dlls/bot/cs_bot_manager.cpp
+@@ -1579,6 +1579,11 @@
+ 	if (!AreBotsAllowed())
+ 		return false;
+ 
++    if (CVAR_GET_FLOAT("sv_lan") && !CVAR_GET_FLOAT("nano_nav_analyze") && TheNavAreaList.empty()) {
++        CONSOLE_ECHO("Nano: no usable NAV; disabling bots. Enable NAV analysis in Advanced.\n");
++        CVAR_SET_FLOAT("bot_quota", 0);
++        return false;
++    }
+ 	int nTeamSlot = UNASSIGNED;
+ 	if (team == BOT_TEAM_ANY)
+ 	{

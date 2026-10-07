@@ -1,0 +1,70 @@
+--- a/controls/YesNoMessageBox.cpp
++++ b/controls/YesNoMessageBox.cpp
+@@ -107,6 +107,7 @@
+ */
+ void CMenuYesNoMessageBox::_VidInit()
+ {
++    if(NanoMenuEnabled()){NanoArrangeDialog();return;}
+ 	SetRect( DLG_X + 192, 256, 640, 256 );
+ 	pos.x += uiStatic.xOffset;
+ 	pos.y += uiStatic.yOffset;
+@@ -124,7 +125,7 @@
+     NanoArrangeDialog();
+ 	UI_FillRect( 0, 0, gpGlobals->scrWidth, gpGlobals->scrHeight, 0x40000000 );
+ 
+-	EngFuncs::FillRGBA( m_scPos.x, m_scPos.y, m_scSize.w, m_scSize.h, 20, 20, 20, 235 );
++	EngFuncs::FillRGBA( m_scPos.x, m_scPos.y, m_scSize.w, m_scSize.h, 20,20,20,NanoMenuEnabled()?255:235 );
+ 	UI_DrawRectangle( m_scPos, m_scSize, uiInputFgColor );
+ 
+ 	if(NanoMenuEnabled()) {
+--- a/font/BaseFontBackend.cpp
++++ b/font/BaseFontBackend.cpp
+@@ -582,7 +582,7 @@
+ 	bmp_t *bmp;
+ 
+ 	// skip special symbol used for engine
+-	V_snprintf( path, sizeof( path ), (ScreenWidth<=320 && EngFuncs::GetCvarFloat("nano_hud_profile"))?".fontcache/nano-v2-r2/%s":".fontcache/%s", filename[0] == '#' ? filename + 1 : filename );
++	V_snprintf( path, sizeof( path ), (ScreenWidth<=320 && EngFuncs::GetCvarFloat("nano_hud_profile"))?".fontcache/nano-v2-r3/%s":".fontcache/%s", filename[0] == '#' ? filename + 1 : filename );
+ 
+ 	if( !EngFuncs::FileExists( path ))
+ 		return false;
+@@ -772,7 +772,7 @@
+ 	if( buf_p + bmpSize - data != size )
+ 		Host_Error( "%s: %i: buf_p + bmpSize - data != size", __FILE__, __LINE__ );
+ 
+-	V_snprintf( path, sizeof( path ), (ScreenWidth<=320 && EngFuncs::GetCvarFloat("nano_hud_profile"))?".fontcache/nano-v2-r2/%s":".fontcache/%s", filename );
++	V_snprintf( path, sizeof( path ), (ScreenWidth<=320 && EngFuncs::GetCvarFloat("nano_hud_profile"))?".fontcache/nano-v2-r3/%s":".fontcache/%s", filename );
+ 	EngFuncs::COM_SaveFile( path, data, size );
+ 
+ 	delete[] data;
+--- a/menus/ConnectionProgress.cpp
++++ b/menus/ConnectionProgress.cpp
+@@ -23,6 +23,7 @@
+ 
+ #include "ItemsHolder.h"
+ #include "ProgressBar.h"
++#include "nano-menu-layout.h"
+ #include "PicButton.h"
+ #include "YesNoMessageBox.h"
+ 
+@@ -331,6 +332,20 @@
+ 		Hide();
+ 		return;
+ 	}
++    if(NanoMenuEnabled()) {
++        SetRect(0,0,(int)ceilf(ScreenWidth/uiStatic.scaleX),(int)ceilf(ScreenHeight/uiStatic.scaleY));CalcPosition();CalcSizes();DisableTransition();
++        EngFuncs::FillRGBA(0,0,ScreenWidth,ScreenHeight,20,20,20,255);
++        title.SetNanoFont(14);commonText.SetNanoFont(14);downloadText.SetNanoFont(12);
++        NanoMenuWrap(title.font,sTitleString,title.nanoLabel,sizeof(title.nanoLabel),ScreenWidth-24,14);title.szName=title.nanoLabel;
++        const char *status=strcmp(sTitleString,sCommonString)?sCommonString:"Loading map and resources";
++        NanoMenuWrap(commonText.font,status,commonText.nanoLabel,sizeof(commonText.nanoLabel),ScreenWidth-24,14);commonText.szName=commonText.nanoLabel;
++        NanoMenuWrap(downloadText.font,sDownloadString,downloadText.nanoLabel,sizeof(downloadText.nanoLabel),ScreenWidth-24,12);downloadText.szName=downloadText.nanoLabel;
++        NanoMenuRect(title,12,32,ScreenWidth-24,48);title.SetNanoFont(14);title.Draw();
++        NanoMenuRect(commonText,12,88,ScreenWidth-24,64);commonText.SetNanoFont(14);commonText.Draw();
++        NanoMenuRect(commonProgress,12,160,ScreenWidth-24,12);commonProgress.Draw();
++        if(m_iState==STATE_DOWNLOAD){NanoMenuRect(downloadText,12,180,ScreenWidth-24,48);downloadText.SetNanoFont(12);downloadText.Draw();}
++        return;
++    }
+ 	UI_FillRect( 0,0, gpGlobals->scrWidth, gpGlobals->scrHeight, m_iState == STATE_NONE ? 0xFF000000 : 0x40000000 );
+ 	CMenuBaseWindow::Draw();
+ }

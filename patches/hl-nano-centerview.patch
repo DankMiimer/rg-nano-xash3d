@@ -1,0 +1,26 @@
+--- a/cl_dll/input.cpp
++++ b/cl_dll/input.cpp
+@@ -748,6 +748,15 @@
+ static cvar_t *nano_look_accel, *nano_look_delay, *nano_look_ramp;
+ static cvar_t *nano_look_max_yaw, *nano_look_fast;
+ static NanoLookState nanoYaw = { 0, 0.0f };
++int CL_IsDead(void);
++static void NanoCenterView()
++{
++    if(CL_IsDead() || gHUD.m_iIntermission)return;
++    float angles[3];gEngfuncs.GetViewAngles(angles);
++    angles[PITCH]=0;gEngfuncs.SetViewAngles(angles);
++    nanoYaw.direction=0;nanoYaw.held=0;
++}
++
+ 
+ void CL_AdjustAngles( float frametime, float *viewangles )
+ {
+@@ -1150,6 +1159,7 @@
+ 	nano_look_ramp = gEngfuncs.pfnRegisterVariable("nano_look_ramp", "0.75", FCVAR_ARCHIVE);
+ 	nano_look_max_yaw = gEngfuncs.pfnRegisterVariable("nano_look_max_yaw", "210", FCVAR_ARCHIVE);
+ 	nano_look_fast = gEngfuncs.pfnRegisterVariable("nano_look_fast", "0", 0);
++    gEngfuncs.pfnAddCommand("nano_centerview",NanoCenterView);
+ 	cl_yawspeed		= gEngfuncs.pfnRegisterVariable( "cl_yawspeed", "210", 0 );
+ 	cl_pitchspeed		= gEngfuncs.pfnRegisterVariable( "cl_pitchspeed", "225", 0 );
+ 	cl_upspeed		= gEngfuncs.pfnRegisterVariable( "cl_upspeed", "320", 0 );

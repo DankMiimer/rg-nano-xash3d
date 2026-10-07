@@ -73,7 +73,20 @@ trap cleanup EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-load_keys "$ROOT/nano.key" || { echo "Game keymap failed to load"; exit 1; }
+BACKEND=$(cat "$ROOT/backend" 2>/dev/null)
+BACKEND=${BACKEND:-legacy}
+CONTROL_SCHEME=0
+if [ "$BACKEND" = fbdev ] && [ -f "$ROOT/$GAME/nano-control.cfg" ]; then
+    CONTROL_BYTES=$(wc -c < "$ROOT/$GAME/nano-control.cfg")
+    if [ "$CONTROL_BYTES" -le 9 ]; then
+        CONTROL_LINE=
+        IFS= read -r CONTROL_LINE < "$ROOT/$GAME/nano-control.cfg" || true
+        [ "$CONTROL_LINE" != "scheme 1" ] || CONTROL_SCHEME=1
+    fi
+fi
+KEYMAP="$ROOT/nano.key"
+[ "$CONTROL_SCHEME" != 1 ] || KEYMAP="$ROOT/nano-face.key"
+load_keys "$KEYMAP" || { echo "Game keymap failed to load"; exit 1; }
 CPU_MHZ=$(cat "$ROOT/cpu-mhz" 2>/dev/null)
 CPU_MHZ=${CPU_MHZ:-1200}
 if ! "$ROOT/nano-clk-arm" --set "$CPU_MHZ" > "$ROOT/$GAME-clock.log" 2>&1; then
@@ -112,10 +125,24 @@ set -- "$ROOT/engine/xash3d" -game "$GAME" -ref soft -clientlib "$GAME/cl_dlls/c
 [ "${NANO_DIAGNOSTIC:-0}" != 1 ] || set -- "$@" -dev 1 +s_info +volume
 case "$GAME" in
     valve) set -- "$@" +map c0a0;;
-    cstrike) set -- "$@" +maxplayers 4 +sv_lan 1 +exec nano-offline.cfg +map de_dust;;
+    cstrike)
+        if [ "$BACKEND" = fbdev ]; then
+            set -- "$@" +maxplayers 8 +sv_lan 1
+        else
+            set -- "$@" +maxplayers 4 +sv_lan 1 +exec nano-offline.cfg +map de_dust
+        fi;;
 esac
+if [ "$BACKEND" = fbdev ] && [ -f "$ROOT/nano-ui-migrate.sh" ]; then
+    sh "$ROOT/nano-ui-migrate.sh" "$ROOT/$GAME/nano-settings.cfg" "$GAME" ||
+        echo "HUD migration failed; original settings retained" >> "$LOGS/supervisor.log"
+fi
 set -- "$@" +exec nano-controls.cfg
 [ ! -f "$ROOT/$GAME/nano-settings.cfg" ] || set -- "$@" +exec nano-settings.cfg
+if [ "$BACKEND" = fbdev ]; then
+    set -- "$@" +nano_control_scheme "$CONTROL_SCHEME"
+    [ "$CONTROL_SCHEME" != 1 ] || set -- "$@" +exec nano-face-controls.cfg
+fi
+[ "$GAME" != cstrike ] || [ "$BACKEND" != fbdev ] || set -- "$@" +menu_nano_match
 [ "$BACKEND" != fbdev ] || [ "${NANO_PROFILE:-0}" != 1 ] || set -- "$@" +nano_profile 1
 "$ROOT/nano-supervise-arm" "$LOGS" "$SOCKET" -- "$@" > "$LOGS/supervisor.log" 2>&1 &
 WATCH_PID=$!

@@ -32,13 +32,16 @@ static std::map<std::string,float> cvars;
 static std::string saved;
 static unsigned writes;
 static bool writeOK=true,native=true;
-static std::string commands;
+static std::string commands;static std::string controlPreference;
 static struct { struct { const char *gamefolder; } m_gameinfo; } gMenu={{"cstrike"}};
 struct EngFuncs {
+    static char *COM_LoadFile(const char *name,int *size){const std::string &text=!strcmp(name,"nano-settings.cfg")?saved:controlPreference;*size=(int)text.size();if(!*size)return nullptr;char *out=(char*)malloc(*size);memcpy(out,text.data(),*size);return out;}
+    static void COM_FreeFile(void *p){free(p);}
     static void CvarSetValue(const char *name,float value){ cvars[name]=value; }
     static const char *GetCvarString(const char *){return native?"0":"";}
     static void ClientCmd(bool,const char *text){commands=text;}
     static int COM_SaveFile(const char *name,const void *data,int len){
+        if(!strcmp(name,"nano-control.cfg")){if(writeOK)controlPreference.assign((const char*)data,len);return writeOK;}
         assert(!strcmp(name,"nano-settings.cfg"));++writes;
         if(writeOK)saved.assign((const char *)data,len);
         return writeOK;
@@ -67,6 +70,11 @@ static void LoadSaved(const std::string& text) {
     }
 }
 int main(){
+    CMenuNanoControls control;control._Init();control._VidInit();assert(!control.face.bChecked);
+    control.face.bChecked=true;control.Changed();assert(controlPreference=="scheme 1\n");
+    CMenuNanoControls controlsReopened;controlsReopened._Init();controlsReopened._VidInit();assert(controlsReopened.face.bChecked);
+    writeOK=false;control.face.bChecked=false;control.Changed();assert(controlPreference=="scheme 1\n" && strstr(control.status.szName,"Save failed"));writeOK=true;
+    controlPreference="scheme 1;quit\n";controlsReopened._VidInit();assert(!controlsReopened.face.bChecked);controlPreference.clear();
     NanoSettings s=NanoSettingsDefaults();
     s.fps=NAN;s.delay=INFINITY;s.ramp=-10;s.limitFPS=-2;
     s=NanoSettingsSanitize(s);
@@ -82,16 +90,16 @@ int main(){
     menu.fps.SetCurrentValue(45);menu.Changed();
     assert(cvars["fps_max"]==45 && !menu.fps.grayed);
     assert(!strcmp(menu.labels[0],"FPS cap: 45"));
-    menu.limitFPS.bChecked=false;menu.lookAccel.bChecked=false;menu.Changed();
+    menu.limitFPS.bChecked=false;menu.Changed();
     assert(cvars["fps_max"]==0 && cvars["nano_fps_value"]==45);
-    assert(menu.fps.grayed && menu.delay.grayed && menu.ramp.grayed);
+    assert(menu.fps.grayed);
     assert(saved.find("set nano_fps_value \"45\"")!=std::string::npos);
     assert(saved.find("fps_max \"0\"")!=std::string::npos);
     menu.limitFPS.bChecked=true;menu.Changed();assert(cvars["fps_max"]==45);
     writeOK=false;menu.Changed();assert(strstr(menu.saveStatus.szName,"Save failed"));
     menu._VidInit();assert(menu.frameSleep.visible && menu.fps.GetCurrentValue()==45);
     native=false;menu._VidInit();assert(!menu.frameSleep.visible);
-    writeOK=true;menu.Defaults();assert(cvars["fps_max"]==30 && cvars["nano_look_accel"]==0);
+    writeOK=true;menu.Defaults();assert(cvars["fps_max"]==30 && cvars["nano_look_accel"]==1);
     CMenuNanoOptions aim(1);aim._Init();aim._VidInit();
     aim.yaw.SetCurrentValue(85);aim.pitch.SetCurrentValue(90);aim.fastMultiplier.SetCurrentValue(2);
     aim.Changed();
@@ -106,9 +114,14 @@ int main(){
     assert(reopened.yaw.GetCurrentValue()==85 && reopened.bottom.GetCurrentValue()==1);
     reopened.Defaults();assert(cvars["cl_yawspeed"]==70 && cvars["nano_look_accel"]==1);
     assert(cvars["nano_hud_bottom"]==1); // reset only the active page
-    hud._VidInit();hud.Defaults();assert(cvars["nano_hud_bottom"]==1.125f);
-    gMenu.m_gameinfo.gamefolder="valve";hud._VidInit();assert(!hud.radar.visible && !hud.menuText.visible);
+    hud._VidInit();hud.Defaults();assert(fabs(cvars["nano_hud_bottom"]-0.8f)<0.0001f);
+    gMenu.m_gameinfo.gamefolder="valve";hud._VidInit();assert(!hud.radar.visible && hud.menuText.visible);
     assert(!strcmp(menu.saveStatus.szName,"Changes saved"));
+    saved="fps_max \"57\"\nset nano_fps_value \"57\"\ncustom_option 123\n";
+    cvars["fps_max"]=57;cvars["nano_fps_value"]=57;
+    CMenuNanoHUD preserve;preserve._Init();preserve._VidInit();preserve.Changed();
+    assert(cvars["fps_max"]==57 && cvars["nano_fps_value"]==57 && saved.find("custom_option 123")!=std::string::npos);
+    assert(saved.find("fps_max \"57\"")!=std::string::npos);
     return 0;
 }
 '''

@@ -14,9 +14,9 @@ struct cvar_t { float value; };
 struct kbutton_t { int state; };
 static kbutton_t in_speed, in_strafe, in_right, in_left, in_klook, in_forward, in_back, in_lookup, in_lookdown;
 static cvar_t yaw={70}, pitch={75}, angle={0.67f}, down={89}, up={89};
-static cvar_t en={1}, delay={0.15f}, ramp={0.75f}, maximum={210}, fast={0};
+static cvar_t en={1}, delay={0.15f}, ramp={0.75f}, maximum={210}, fast={0}, slow={0};
 static cvar_t *cl_yawspeed=&yaw, *cl_pitchspeed=&pitch, *cl_anglespeedkey=&angle, *cl_pitchdown=&down, *cl_pitchup=&up;
-static cvar_t *nano_look_accel=&en, *nano_look_delay=&delay, *nano_look_ramp=&ramp, *nano_look_max_yaw=&maximum, *nano_look_fast=&fast;
+static cvar_t *nano_look_accel=&en, *nano_look_delay=&delay, *nano_look_ramp=&ramp, *nano_look_max_yaw=&maximum, *nano_look_fast=&fast, *nano_look_slow=&slow;
 static NanoLookState nanoYaw={0,0};
 #define YAW 1
 #define PITCH 0
@@ -81,84 +81,6 @@ static MockHUD gHUD={{369,369},25,0,240.0f/369};
 #include "nano-hud-scope.h"
 ''' + engine[start:end]
 
-# Compile the actual client layout expressions against the actual scope/engine.
-import re
-cs=root/'upstream/cs16-client/cl_dll'
-def placement(path):
-    source=(cs/path).read_text(encoding='utf-8')
-    start=source.index('nanoScope.Place(')
-    return source[start:source.index(';',start)+1]
-ammo=(cs/'ammo.cpp').read_text(encoding='utf-8')
-money=(cs/'hud/money.cpp').read_text(encoding='utf-8')
-death=(cs/'death.cpp').read_text(encoding='utf-8')
-ammo_defs=ammo[ammo.index('int nanoGap ='):ammo.index('nanoScope.Place(',ammo.index('int nanoGap ='))]
-death_y=re.search(r'y = \(int\)ceilf\([^;]+;',death).group(0)
-layout_checks=r'''
-    for (int step=0;step<=15;++step) {
-    bottomVar.value=0.75f+step*0.025f;
-    // Largest stock values: 100 health/armor and three-digit clip/reserve ammo.
-    float armorRight=0;
-    {
-        int y=331, CrossWidth=24, HealthWidth=20, m_HUD_cross=1;
-        NanoHudScope nanoScope("nano_hud_bottom",0,1);
-        HEALTH_PLACE
-        float x=12,fy=y,w=82,h=25;
-        SPR_AdjustSize(&x,&fy,&w,&h);
-        assert(x>=0 && fy+h<=240);
-        float healthRight=x+w;
-        nanoScope.Reset();
-        int xArmor=73;
-        { struct { TestRect rect; } m_hEmpty[1]={{{24,24}}};
-          int m_enArmorType=0,m_iHeight=24;
-          int x=xArmor;
-          int dw=20,cw=24;float size=bottomVar.value;
-          NanoHudScope nanoScope("nano_hud_bottom",0,1);
-          ARMOR_PLACE
-          float ax=x,ay=y,aw=84,ah=25;
-          SPR_AdjustSize(&ax,&ay,&aw,&ah);
-          assert(ax>=healthRight+1 && ay+ah<=240);
-          armorRight=ax+aw;
-        }
-    }
-    {
-        int ScreenWidth=369, y=331, AmmoWidth=20;
-        struct { TestRect rcAmmo; } weapon={{24,24}};
-        auto *m_pWeapon=&weapon;
-        AMMO_DEFS
-        NanoHudScope nanoScope("nano_hud_bottom",1,1);
-        AMMO_PLACE
-        float x=ScreenWidth-nanoAmmoWidth,fy=y-3,w=nanoAmmoWidth,h=28;
-        SPR_AdjustSize(&x,&fy,&w,&h);
-        assert(x>=armorRight+2 && x+w<=240 && fy+h<=240);
-    }
-    {
-        int x=243,y=40,balanceWidth=118;
-        struct { TestRect rect; } m_hDollar={{18,25}};
-        NanoHudScope nanoScope("nano_hud_bottom",1,0.5f);
-        MONEY_PLACE
-        float mx=x,my=y,mw=balanceWidth,mh=25;
-        SPR_AdjustSize(&mx,&my,&mw,&mh);
-        assert(my>=0 && my<=2 && mx+mw<=240);
-        float moneyBottom=my+mh;
-        nanoScope.Reset();
-        int moneyHeight=25,i=0;
-        // The side scale is 1.125, as in the installed profile.
-        DEATH_Y
-        assert(y*(240.0f/369)>moneyBottom+2);
-    }
-    // Native artwork is not downsampled: every source pixel retains one output pixel.
-    pixelVar.value=1;
-    x=2;y=84;w=32;h=32;
-    SPR_AdjustSize(&x,&y,&w,&h);
-    assert(x==2 && y==84 && w==32 && h==32);
-    pixelVar.value=0;
-    }
-    bottomVar.value=1.125f;
-'''
-layout_checks=layout_checks.replace('HEALTH_PLACE',placement('health.cpp')).replace('ARMOR_PLACE',placement('battery.cpp'))
-layout_checks=layout_checks.replace('AMMO_DEFS',ammo_defs).replace('AMMO_PLACE',placement('ammo.cpp'))
-layout_checks=layout_checks.replace('MONEY_PLACE',placement('hud/money.cpp')).replace('DEATH_Y',death_y)
-
 for name,src in [('hl',native/'hlsdk/cl_dll/input.cpp'),('cs',root/'upstream/cs16-client/cl_dll/input.cpp')]:
     text=src.read_text(encoding='utf-8');start=text.index('void CL_AdjustAngles');brace=text.index('{',start);depth=1;end=brace+1
     while depth:
@@ -197,6 +119,17 @@ int main() {
     in_klook.state=1;in_forward.state=1;v[PITCH]=0;
     for(int i=0;i<100;i++) CL_AdjustAngles(0.01f,v);
     assert(fabsf(v[PITCH]+75)<0.01f); // pitch never ramps
+    // Actual camera functions in both clients: quarter speed on both axes,
+    // no ramp while held, immediate return to the base rate after release.
+    in_strafe.state=0;in_klook.state=0;in_forward.state=0;in_lookup.state=1;slow.value=1;v[PITCH]=v[YAW]=0;
+    for(int i=0;i<100;++i)CL_AdjustAngles(0.01f,v);
+    assert(fabsf(v[YAW]+17.5f)<0.01f && fabsf(v[PITCH]+18.75f)<0.01f && nanoYaw.held==0);
+    slow.value=0;oldYaw=v[YAW];float oldPitch=v[PITCH];CL_AdjustAngles(0.01f,v);
+    assert(fabsf(v[YAW]-oldYaw+0.7f)<0.001f && fabsf(v[PITCH]-oldPitch+0.75f)<0.001f);
+    in_right.state=0;in_left.state=1;in_lookup.state=0;in_lookdown.state=1;slow.value=1;v[PITCH]=v[YAW]=0;
+    for(int i=0;i<100;++i)CL_AdjustAngles(0.01f,v);
+    assert(fabsf(v[YAW]-17.5f)<0.01f && fabsf(v[PITCH]-18.75f)<0.01f);
+    slow.value=0;in_left.state=in_lookdown.state=0;
     float x=20,y=220,w=24,h=16;
     NanoHudRect(&x,&y,&w,&h,240,240,1.125f,0,1);
     assert(x==23 && y==218 && w==27 && h==18);
@@ -262,9 +195,8 @@ int main() {
     return 0;
 }
 '''
-    checks=checks.replace('    NanoCrosshairRect arms[4];',layout_checks+'\n    NanoCrosshairRect arms[4];')
     out=root/'build'/('test-nano-'+name+'.cpp');out.write_text(code+fn+checks,encoding='utf-8')
     exe=out.with_suffix('')
     subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I'+str(root/'src'),str(out),'-o',str(exe)],check=True)
     subprocess.run([str(exe)],check=True)
-    print(name+': yaw ramp, unchanged pitch/strafe, compact ammo, money/kill clearance and pixel coverage passed')
+    print(name+': camera ramp, quarter-speed yaw/pitch, unaffected strafe, HUD scope restoration and pixel coverage passed')

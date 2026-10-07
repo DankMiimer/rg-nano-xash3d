@@ -14,12 +14,23 @@ for name,base in [('hl',native/'xash3d/3rdparty/mainui'),('cs',root/'upstream/cs
 #include <cassert>
 #include <cstddef>
 #include <cmath>
+#include <cstring>
+#include <strings.h>
+#define stricmp strcasecmp
+#define L(x) (x)
+#define QMF_HIDDENBYPARENT 1
+#define Q_max(a,b) ((a)>(b)?(a):(b))
+#define bound(a,x,b) ((x)<(a)?(a):(x)>(b)?(b):(x))
+void UI_NanoMatch_Menu(){}
+void UI_MultiPlayer_Menu(){}
+bool CL_IsActive(){return false;}
+static struct {struct {const char *gamefolder;} m_gameinfo;} gMenu={{"valve"}};
 struct Size { int w,h; Size(int x=0,int y=0):w(x),h(y){} };
 struct Point { int x,y; };
 static float ScreenWidth=240, ScreenHeight=240;
 static struct { float scaleX,scaleY,yOffset; Size buttons_draw_size; } uiStatic={240.0f/1024,240.0f/1024,128,Size(256,32)};
 static struct { int developer; } globals={1},*gpGlobals=&globals;
-struct EngFuncs { static float GetCvarFloat(const char *) { return 1; } };
+struct EngFuncs { static float GetCvarFloat(const char *) { return 1; } static bool CheckGameDll(){return true;} };
 typedef int HFont;
 struct CBaseFont {};
 static int created;
@@ -33,32 +44,42 @@ struct CFontBuilder {
 };
 #define QM_DEFAULTFONT 0
 struct CMenuPicButton {
-    int charSize=26; HFont font=0; Size size; Point pos={0,0},rendered={0,0}; bool visible=true; void *parent=NULL;
+    int iFlags=0; const char *szName="Game menu",*nanoLabelSource=nullptr; char nanoLabel[1024]={0};
+    int charSize=26,nanoFontPixels=14; HFont font=0; Size size; Point pos={0,0},rendered={0,0}; bool visible=true; void *parent=NULL;
+    void (*onReleased)()=nullptr;
+    void SetNameAndStatus(const char*,const char*){}
     void SetCharSize(int){charSize=26;font=1;}
     void SetNanoScale(float);
+    void SetNanoFont(int pixels=12);
     bool IsVisible(){return visible;}
     void SetVisibility(bool v){visible=v;}
+    void SetGrayed(bool){}
     void *Parent(){return parent;}
     void SetCoord(int x,int y){pos.x=x;pos.y=y;}
     void CalcPosition(){rendered=pos;}
     void CalcSizes(){}
 };
 struct CMenuMain {
-    bool nanoLayout=false;
+    bool nanoLayout=false; int nanoScroll=0; CMenuPicButton *focused=nullptr;
+    CMenuPicButton *ItemAtCursor(){return focused;}
     Point pos={0,128}; Size size={1024,768};
     void SetCoord(int x,int y){pos={x,y};}
     void SetSize(int w,int h){size=Size(w,h);}
     void CalcPosition(){}
     void CalcSizes(){}
-    CMenuPicButton banner,movieBanner,animatedBanner;
-    CMenuPicButton console,disconnect,resumeGame,newGame,hazardCourse,configuration,saveRestore,multiPlayer,customGame,readme,previews,quit;
+    CMenuPicButton banner,movieBanner,animatedBanner,minimizeBtn,quitButton;
+    CMenuPicButton nanoSpectator,console,disconnect,resumeGame,newGame,hazardCourse,configuration,saveRestore,multiPlayer,customGame,readme,previews,quit;
     void NanoArrange(bool);
 };
 '''
+    code+=r'void NanoMenuWrap(HFont,const char *s,char *d,size_t n,int,int){strncpy(d,s,n);d[n-1]=0;}'
+    code+=r'void NanoMenuRect(CMenuPicButton &item,int x,int y,int w,int h){item.SetCoord(ceilf(x/uiStatic.scaleX),ceilf(y/uiStatic.scaleY));item.size=Size(ceilf(w/uiStatic.scaleX),ceilf(h/uiStatic.scaleY));}'
     code+=function((base/'controls/PicButton.cpp').read_text(),'void CMenuPicButton::SetNanoScale(')
+    code+=function((base/'controls/BaseItem.cpp').read_text(),'void CMenuBaseItem::SetNanoFont(').replace('CMenuBaseItem::','CMenuPicButton::')
     code+=function((base/'menus/Main.cpp').read_text(),'void CMenuMain::NanoArrange(')
     code+=r'''
 int main(){
+    (void)gMenu;
     CMenuPicButton button;
     button.SetNanoScale(2); assert(created==1 && button.charSize==52);
     button.SetNanoScale(2); assert(created==1 && button.charSize==52);
@@ -70,10 +91,10 @@ int main(){
     if name=='cs':code+='&menu.readme,'
     code+=r'''&menu.previews,&menu.quit};
     for(auto row:rows)row->parent=&menu;
-    menu.NanoArrange(true);assert(created==2); // font reused across all buttons
+    menu.NanoArrange(true);assert(created==3); // font reused across all buttons
     float previous=-1;
     for(auto row:rows){
-        if(!row->visible)continue;
+        if(!row->visible || row->iFlags&QMF_HIDDENBYPARENT)continue;
         // The actual base item wraps a negative position from the parent's bottom.
         float local=row->pos.y*uiStatic.scaleY;
         if(local<0)local+=menu.size.h*uiStatic.scaleY;
@@ -81,16 +102,25 @@ int main(){
         float height=row->size.h*uiStatic.scaleY;
         assert(top>=7 && top+height<=240 && top>previous);
         previous=top+height;
-        assert(row->charSize==52);
+        assert(row->charSize*uiStatic.scaleY>=14);
     }
+    menu.focused=&menu.quit;menu.NanoArrange(false);
+    assert(!(menu.quit.iFlags&QMF_HIDDENBYPARENT) && menu.nanoScroll==0);
+    assert(!menu.customGame.visible && !menu.previews.visible);
+    ScreenHeight=144;menu.NanoArrange(false);assert(menu.nanoScroll>0);
+    ScreenHeight=240;
+    menu.focused=&menu.newGame;menu.NanoArrange(false);assert(!(menu.newGame.iFlags&QMF_HIDDENBYPARENT));
+    assert(!menu.minimizeBtn.visible && !menu.quitButton.visible);
     globals.developer=0;menu.NanoArrange(false);assert(!menu.console.visible);
-    globals.developer=1;menu.NanoArrange(false);assert(!menu.console.visible && created==2);
+    globals.developer=1;menu.NanoArrange(false);assert(!menu.console.visible && created==3);
     menu.newGame.visible=false;menu.NanoArrange(false);
     menu.newGame.visible=true;menu.NanoArrange(false);
-    assert(menu.newGame.pos.y<menu.hazardCourse.pos.y);
+    assert(!(menu.newGame.iFlags&QMF_HIDDENBYPARENT));
     return 0;
 }
 '''
+    if name=='cs':
+        code=code.replace('    return 0;\n}', '    gMenu.m_gameinfo.gamefolder="cstrike";menu.NanoArrange(true);\n    assert(menu.newGame.onReleased==UI_NanoMatch_Menu && !menu.multiPlayer.visible && !menu.saveRestore.visible && !menu.hazardCourse.visible && !menu.readme.visible);\n    return 0;\n}')
     path=root/'build'/('test-menu-'+name+'.cpp');path.write_text(code)
     exe=path.with_suffix('')
     subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-Werror','-fsanitize=address,undefined',str(path),'-o',str(exe)],check=True)
